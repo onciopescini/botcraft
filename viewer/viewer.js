@@ -409,8 +409,7 @@ function loop(now) {
   if (frames.length) {
     const i = Math.min(frames.length - 2, Math.floor(tFloat));
     drawFrame(frames[i], frames[i + 1], tFloat - i);
-    if (camMode === 'follow') {
-      // punto medio dei capitani (o delle 6 unità se v2)
+    if (camMode === 'follow') {      // punto medio dei capitani (o delle 6 unità se v2)
       const f = frames[Math.floor(tFloat)];
       const pts = (Array.isArray(f.t1) && Array.isArray(f.t2)) ? [...f.t1, ...f.t2] : [f.p1, f.p2];
       const mx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
@@ -419,8 +418,13 @@ function loop(now) {
       camera.position.set(wx, 18, wz + 14);
       camera.lookAt(wx, 0, wz);
     } else {
-      camera.position.set(16, 34, 26);
-      camera.lookAt(16, 0, 16);
+      // orbita: trascina (mouse+touch) per ruotare, pinch per zoom
+      const cx = 0, cz = 0;
+      camera.position.set(
+        cx + orbit.r * Math.sin(orbit.phi) * Math.sin(orbit.theta),
+        orbit.r * Math.cos(orbit.phi),
+        cz + orbit.r * Math.sin(orbit.phi) * Math.cos(orbit.theta));
+      camera.lookAt(cx, 0, cz);
     }
     const nowS = performance.now();
     if (SET.shake && nowS < shakeUntil) {
@@ -435,6 +439,32 @@ function loop(now) {
 }
 requestAnimationFrame(loop);
 let camMode = 'orbit';
+// orbita touch+mouse: drag ruota, pinch zoom (solo in modalità orbita)
+const orbit = { theta: 0, phi: 0.28, r: 36 };
+{
+  let last = null, pinch = 0;
+  canvas.style.touchAction = 'none';
+  const pos = e => ({ x: e.clientX ?? e.touches?.[0]?.clientX, y: e.clientY ?? e.touches?.[0]?.clientY });
+  canvas.addEventListener('pointerdown', e => { last = pos(e); canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', e => {
+    if (!last || camMode !== 'orbit') return;
+    const p = pos(e);
+    orbit.theta -= (p.x - last.x) * 0.006;
+    orbit.phi = Math.min(1.35, Math.max(0.15, orbit.phi - (p.y - last.y) * 0.004));
+    last = p;
+  });
+  const end = () => { last = null; pinch = 0; };
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+  canvas.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && camMode === 'orbit') {
+      e.preventDefault();
+      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      if (pinch) orbit.r = Math.min(70, Math.max(14, orbit.r * (pinch / d)));
+      pinch = d;
+    }
+  }, { passive: false });
+}
 
 document.getElementById('file').addEventListener('change', async (e) => {
   const f = e.target.files[0];

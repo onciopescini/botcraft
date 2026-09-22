@@ -84,11 +84,19 @@
     <ol><li>Scrivi <code>decide(obs)</code> in Python</li><li><code>sdk check</code> in locale</li><li>Submit → Elo → replay 3D</li><li>Forka il nemico, itera, rivinci</li></ol>
   </div>
   <div class="card"><h3>Tornei</h3>
-    <p>Bracket a 8 ogni weekend + commento caster AI. Il campione finisce qui con replay embeddato. Prossimo: invita 5 amici e si parte.</p>
+    <p id="champ">Bracket a 8 ogni weekend + commento caster AI.</p>
   </div>
 </section>
 <footer>Botcraft · <a href="./privacy.html">dati e privacy</a> · replay v1/v2 · <a href="https://github.com/onciopescini/botcraft">MIT</a></footer>
 <script>
+(async () => {
+  try {
+    const c = await (await fetch('./champion.json')).json();
+    if (c.champion) document.getElementById('champ').innerHTML =
+      `Campione <b>${c.champion}</b> (${c.title}) — finale ${c.final.s0}-${c.final.s1} ` +
+      `<a style="color:#7db4ff" href="./viewer/${c.share.replace('/viewer/', '')}">guarda la finale</a>`;
+  } catch {}
+})();
 (async () => {
   const el = document.getElementById('lb'), note = document.getElementById('lbnote');
   const bases = ['https://botcraft-6tjh.onrender.com', 'http://localhost:8000', ''];
