@@ -202,6 +202,16 @@ def step_squad(st, acts: list) -> dict:
             if u["hp"] <= 0:
                 u["hp"] = 0
                 u["alive"] = False
+    # sudden death condivisa (mt=300 fisso squad)
+    _probe = {"tick": st["tick"], "max_ticks": 300}
+    r = base.gas_radius(_probe)
+    if r < 99.0:
+        for u in st["units"]:
+            if u["alive"] and base._manhattan((u["x"], u["y"]), base.TOTEM) > r:
+                u["hp"] -= base.GAS_DMG
+                if u["hp"] <= 0:
+                    u["hp"] = 0
+                    u["alive"] = False
     alive_a = any(u["alive"] for u in st["units"][:3])
     alive_b = any(u["alive"] for u in st["units"][3:])
     if st["tick"] >= MAX_TICKS or not (alive_a or alive_b) or not (alive_a and alive_b):

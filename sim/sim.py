@@ -11,6 +11,8 @@ VIEW_RADIUS = 7
 WALL_DURATION = 30
 RESPAWN_DELAY = 20
 TOTEM = (16, 16)
+GAS_DMG = 5          # sudden death fuori zona sicura
+BOUNTY = 5           # taglia su chi è in testa quando lo uccidi
 
 VALID_ACTIONS = {
     "move_N", "move_S", "move_E", "move_W",
@@ -31,7 +33,7 @@ def _manhattan(a, b):
     return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
 
-def new_match(seed: int) -> dict:
+def new_match(seed: int, max_ticks: int = MAX_TICKS) -> dict:
     rng = random.Random(seed)
     # spawn flip deterministico
     spawns = [(2, 2), (29, 29)]
@@ -58,13 +60,14 @@ def new_match(seed: int) -> dict:
     state = {
         "seed": seed,
         "tick": 0,
+        "max_ticks": max(20, max_ticks),
         "respawn_counter": 0,
         "agents": [
             {"x": spawns[0][0], "y": spawns[0][1], "hp": 100, "wood": 0, "stone": 0, "gold": 0,
-             "sticks": 0, "has_sword": False, "walls_left": 5,
+             "sticks": 0, "has_sword": False, "walls_left": 5, "bounty": 0,
              "alive": True, "noop_streak": 0, "timeouts": 0, "illegal": 0, "kills": 0},
             {"x": spawns[1][0], "y": spawns[1][1], "hp": 100, "wood": 0, "stone": 0, "gold": 0,
-             "sticks": 0, "has_sword": False, "walls_left": 5,
+             "sticks": 0, "has_sword": False, "walls_left": 5, "bounty": 0,
              "alive": True, "noop_streak": 0, "timeouts": 0, "illegal": 0, "kills": 0},
         ],
         "trees": trees,
@@ -72,11 +75,30 @@ def new_match(seed: int) -> dict:
         "golds": golds,
         "pending_respawns": [],  # [due_tick, type]
         "messages": ["", ""],
+        "coach": [None, None],  # per lato: {"tick":t,"x":x,"y":y} ping del coach
         "walls": {},  # "x,y" -> expiry_tick
         "events": [[], []],
         "over": False,
     }
     return state
+
+
+def set_coach(state: dict, pid: int, tick: int, x: int, y: int):
+    """1 ping del coach per match: da tick in poi il bot vede obs["coach"]."""
+    tick = max(0, min(state["max_ticks"], int(tick)))
+    x = max(0, min(W - 1, int(x)))
+    y = max(0, min(H - 1, int(y)))
+    state["coach"][pid] = {"tick": tick, "x": x, "y": y}
+
+
+def gas_radius(state: dict) -> float:
+    """Sudden death: ultimi 1/6 di match, raggio 22 -> 3 sul totem."""
+    mt = state["max_ticks"]
+    start = mt * 5 // 6
+    if state["tick"] < start:
+        return 99.0
+    f = (state["tick"] - start) / max(1, mt - start)
+    return 22.0 - 19.0 * f
 
 
 def _free_cell(state, rng):
@@ -281,6 +303,9 @@ def _apply(state, pid, action: dict):
                 foe["alive"] = False
                 me["kills"] += 1
                 _push_event(state, pid, "kill")
+                if score(state, 1 - pid) > score(state, pid):
+                    me["bounty"] += BOUNTY
+                    _push_event(state, pid, f"bounty +{BOUNTY}")
         else:
             _push_event(state, pid, "attack_miss")
             me["noop_streak"] += 1
@@ -308,7 +333,18 @@ def step(state: dict, a1: dict, a2: dict) -> dict:
             if me["hp"] <= 0:
                 me["hp"] = 0
                 me["alive"] = False
-    if state["tick"] >= MAX_TICKS or not (state["agents"][0]["alive"] or state["agents"][1]["alive"]):
+    # sudden death: fuori dalla zona sicura -> gas
+    r = gas_radius(state)
+    if r < 99.0:
+        for pid in (0, 1):
+            me = state["agents"][pid]
+            if me["alive"] and _manhattan((me["x"], me["y"]), TOTEM) > r:
+                me["hp"] -= GAS_DMG
+                _push_event(state, pid, "gas -5")
+                if me["hp"] <= 0:
+                    me["hp"] = 0
+                    me["alive"] = False
+    if state["tick"] >= state["max_ticks"] or not (state["agents"][0]["alive"] or state["agents"][1]["alive"]):
         state["over"] = True
     return state
 
@@ -345,16 +381,18 @@ def to_obs(state: dict, pid: int) -> dict:
                   "hp": foe["hp"] if visible else -1},
         "enemy_message": state.get("messages", ["", ""])[1 - pid] if visible else "",
         "my_last_message": state.get("messages", ["", ""])[pid],
+        "coach": state.get("coach", [None, None])[pid] if state["tick"] >= (state.get("coach", [None, None])[pid] or {}).get("tick", 10 ** 9) else None,
+        "gas_radius": round(gas_radius(state), 1),
         "nearby": nearby,
         "events": list(state["events"][pid][-5:]),
-        "budget": {"ticks_left": MAX_TICKS - state["tick"],
+        "budget": {"ticks_left": state["max_ticks"] - state["tick"],
                    "timeouts_so_far": me["timeouts"]},
     }
 
 
 def score(state: dict, pid: int) -> int:
     me = state["agents"][pid]
-    s = me["wood"] + me["stone"] + me.get("gold", 0) * 3 + me["kills"] * 10
+    s = me["wood"] + me["stone"] + me.get("gold", 0) * 3 + me["kills"] * 10 + me.get("bounty", 0)
     if _manhattan((me["x"], me["y"]), TOTEM) == 1:
         s += 15
     return s
@@ -380,6 +418,7 @@ def result(state: dict) -> dict:
 def state_hash(state: dict) -> str:
     payload = json.dumps({
         "tick": state["tick"],
+        "max_ticks": state["max_ticks"],
         "agents": state["agents"],
         "trees": sorted(state["trees"]),
         "rocks": sorted(state["rocks"]),

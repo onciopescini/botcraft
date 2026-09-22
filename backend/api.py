@@ -63,7 +63,9 @@ class MatchIn(BaseModel):
     a: str
     b: str
     seed: int | None = None
-    mode: str = "1v1"  # 1v1|squad
+    mode: str = "1v1"  # 1v1|blitz|squad
+    coach_a: dict | None = None  # {"tick":t,"x":x,"y":y} 1 ping coach
+    coach_b: dict | None = None
 
 
 @app.post("/agents")
@@ -98,8 +100,8 @@ def post_match(inp: MatchIn, req: Request):
     ok, left = check_quota(tok, league)
     if not ok:
         raise HTTPException(429, f"quota giornaliera {league} esaurita (monetizzabile: alza il piano)")
-    mode = inp.mode if inp.mode in ("1v1", "squad") else "1v1"
-    mid = enqueue(inp.a, inp.b, inp.seed, mode)
+    mode = inp.mode if inp.mode in ("1v1", "blitz", "squad") else "1v1"
+    mid = enqueue(inp.a, inp.b, inp.seed, mode, inp.coach_a, inp.coach_b)
     record_use(tok)
     return {"id": mid, "status": "pending", "league": league, "mode": mode, "quota_left": left - 1,
             "hint": "avvia backend/worker.py per giocarlo"}
@@ -248,7 +250,6 @@ class SeasonIn(BaseModel):
     title: str = "season"
     ticks: int = 500
 
-
 @app.post("/world/seasons")
 def post_season(inp: SeasonIn, req: Request):
     tok = require_token(req)
@@ -324,3 +325,70 @@ def discord_callback(code: str = ""):
         raise HTTPException(502, f"DB token fallito: {type(e).__name__}")
     return {"token": tok, "username": me["username"],
             "hint": "usalo come Authorization: Bearer nei POST"}
+
+
+class DailyIn(BaseModel):
+    name: str
+    coach: dict | None = None  # 1 ping {"tick":t,"x":x,"y":y}
+
+
+@app.get("/daily")
+def get_daily():
+    from backend.store import daily_board
+    return daily_board()
+
+
+@app.post("/daily")
+def post_daily(inp: DailyIn, req: Request):
+    from backend.store import daily_seed, get_agent, register_agent
+    tok = require_token(req)
+    ag = get_agent(inp.name)
+    if not ag:
+        raise HTTPException(404, "agente inesistente")
+    day, seed = daily_seed()
+    if not daily_submit_check(inp.name, day):
+        raise HTTPException(429, "daily già giocato oggi: 1 submit/giorno")
+    try:
+        register_agent("daily-rival", "greedy")
+    except Exception:
+        pass
+    mid = enqueue(inp.name, "daily-rival", seed, "daily", inp.coach, None)
+    record_use(tok)
+    return {"id": mid, "day": day, "seed": seed, "mode": "daily",
+            "hint": "stesso seed per tutti oggi. Chi fa più punti vince il giorno"}
+
+
+def daily_submit_check(name: str, day: str) -> bool:
+    import sqlite3
+    con = sqlite3.connect(str(ROOT / "backend" / "botcraft.db"))
+    row = con.execute("SELECT 1 FROM daily WHERE day=? AND name=?", (day, name)).fetchone()
+    con.close()
+    return row is None
+
+
+class BetIn(BaseModel):
+    mid: int
+    bettor: str
+    pick: str  # a|b
+    amount: int
+
+
+@app.post("/bets")
+def post_bet(inp: BetIn, req: Request):
+    from backend.store import place_bet, get_agent
+    require_token(req)
+    if not get_agent(inp.bettor):
+        raise HTTPException(404, "scommettitore inesistente")
+    try:
+        bid = place_bet(inp.mid, inp.bettor, inp.pick, inp.amount)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"bet": bid, "pot_hint": "i vincitori spartiscono il piatto in proporzione"}
+
+
+@app.get("/coins/{name}")
+def get_coins(name: str):
+    from backend.store import coins_of, get_agent
+    if not get_agent(name):
+        raise HTTPException(404, "agente inesistente")
+    return {"name": name, "coins": coins_of(name)}

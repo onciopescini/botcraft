@@ -19,11 +19,14 @@
 <h1>Botcraft — ladder</h1>
 <div class="row">
   <label>API <input id="api" value="https://botcraft-6tjh.onrender.com" size="28"/></label>
+  <label>Modo
+    <select id="mode"><option value="1v1">1v1 (300 tick)</option><option value="blitz">blitz (60 tick)</option><option value="squad">squad 3v3</option></select>
+  </label>
   <label>Lega
     <select id="league"><option value="">tutte</option><option value="code-only">code-only</option><option value="open">open</option></select>
   </label>
   <button id="go">aggiorna</button>
-  <a href="./">viewer 3D</a>
+  <a href="./">viewer 3D</a> <a href="./daily.html">daily</a> <a href="./bets.html">scommesse</a>
 </div>
 <table><thead><tr><th>#</th><th>nome</th><th>preset</th><th>elo</th><th>match</th></tr></thead>
 <tbody id="lb"><tr><td colspan="5">carico…</td></tr></tbody></table>
@@ -34,8 +37,9 @@ const $ = id => document.getElementById(id);
 async function load() {
   const base = $('api').value.replace(/\/$/, '');
   const lg = $('league').value ? `?league=${$('league').value}` : '';
+  const md = $('mode').value && $('mode').value !== '1v1' ? `${lg ? '&' : '?'}mode=${$('mode').value}` : '';
   try {
-    const lb = await (await fetch(`${base}/leaderboard${lg}`)).json();
+    const lb = await (await fetch(`${base}/leaderboard${lg}${md}`)).json();
     $('lb').innerHTML = lb.map((r, i) =>
       `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.preset}</td><td>${Math.round(r.elo)}</td><td>${r.games}</td></tr>`).join('') || '<tr><td colspan=5>vuota</td></tr>';
     // ultimi 8 match: prova id decrescenti (semplice, senza endpoint lista)

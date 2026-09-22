@@ -7,7 +7,7 @@ import pathlib
 import concurrent.futures as cf
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from sim.sim import new_match, step, to_obs, result, state_hash, VALID_ACTIONS, clean_message
+from sim.sim import new_match, step, to_obs, result, state_hash, VALID_ACTIONS, clean_message, set_coach, gas_radius
 
 TIMEOUT_S = 0.6
 MEM_DIR = pathlib.Path(__file__).resolve().parents[1] / "backend" / "memory"
@@ -55,14 +55,19 @@ def safe_decide(fn, obs):
 
 
 def run_match(decide_a, decide_b, seed: int, out_path: str | None = None,
-              name_a: str = "p1", name_b: str = "p2"):
-    state = new_match(seed)
+              name_a: str = "p1", name_b: str = "p2", max_ticks: int = 300,
+              coach_a: dict | None = None, coach_b: dict | None = None):
+    state = new_match(seed, max_ticks)
+    if coach_a:
+        set_coach(state, 0, coach_a.get("tick", 0), coach_a.get("x", 16), coach_a.get("y", 16))
+    if coach_b:
+        set_coach(state, 1, coach_b.get("tick", 0), coach_b.get("x", 16), coach_b.get("y", 16))
     mem_a, mem_b = load_memory(name_a), load_memory(name_b)
     new_mem_a, new_mem_b = mem_a, mem_b
     replay = []
     with cf.ThreadPoolExecutor(max_workers=2) as _:
         pass  # warmup threads su Windows
-    for _ in range(300):
+    for _ in range(state["max_ticks"] + 5):
         if state["over"]:
             break
         obs_a, obs_b = to_obs(state, 0), to_obs(state, 1)
@@ -82,6 +87,7 @@ def run_match(decide_a, decide_b, seed: int, out_path: str | None = None,
         replay.append({
             "v": 1,
             "tick": state["tick"],
+            "gas": round(gas_radius(state), 1),
             "p1": {"x": state["agents"][0]["x"], "y": state["agents"][0]["y"],
                    "hp": state["agents"][0]["hp"], "wood": state["agents"][0]["wood"],
                    "stone": state["agents"][0]["stone"], "gold": state["agents"][0].get("gold", 0),
@@ -92,7 +98,9 @@ def run_match(decide_a, decide_b, seed: int, out_path: str | None = None,
                    "sword": state["agents"][1]["has_sword"]},
             "a1": a1["action"], "a2": a2["action"],
             "m1": state["messages"][0], "m2": state["messages"][1],
+            "c1": state["coach"][0], "c2": state["coach"][1],
             "s1": s1, "s2": s2,
+            "gas": round(gas_radius(state), 1),
             "trees": [list(p) for p in state["trees"]],
             "rocks": [list(p) for p in state["rocks"]],
             "golds": [list(p) for p in state.get("golds", [])],
@@ -104,7 +112,7 @@ def run_match(decide_a, decide_b, seed: int, out_path: str | None = None,
     res["v"] = 1
     res["hash"] = state_hash(state)
     res["seed"] = seed
-    if state["over"] or state["tick"] >= 300:
+    if state["over"] or state["tick"] >= state["max_ticks"]:
         save_memory(name_a, new_mem_a)
         save_memory(name_b, new_mem_b)
     if out_path:

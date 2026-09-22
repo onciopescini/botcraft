@@ -1,5 +1,6 @@
-"""Store SQLite Botcraft — agenti, coda match, Elo."""
+"""Store SQLite Botcraft — agenti, coda match, Elo+Glicko-RD, daily, coin."""
 from __future__ import annotations
+import json
 import sqlite3
 import pathlib
 import time
@@ -42,14 +43,29 @@ def init():
       token TEXT PRIMARY KEY, discord_id TEXT NOT NULL, username TEXT NOT NULL DEFAULT '',
       created REAL NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS daily(
+      day TEXT NOT NULL, name TEXT NOT NULL, score INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (day, name)
+    );
+    CREATE TABLE IF NOT EXISTS bets(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mid INTEGER NOT NULL, bettor TEXT NOT NULL, pick TEXT NOT NULL,
+      amount INTEGER NOT NULL, settled INTEGER NOT NULL DEFAULT 0
+    );
     """)
     con.commit()
     for ddl in ("ALTER TABLE agents ADD COLUMN elo_squad REAL NOT NULL DEFAULT 1200",
                 "ALTER TABLE agents ADD COLUMN games_squad INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE agents ADD COLUMN elo_blitz REAL NOT NULL DEFAULT 1200",
+                "ALTER TABLE agents ADD COLUMN games_blitz INTEGER NOT NULL DEFAULT 0",
                 "ALTER TABLE agents ADD COLUMN rd REAL NOT NULL DEFAULT 350",
                 "ALTER TABLE agents ADD COLUMN rd_squad REAL NOT NULL DEFAULT 350",
+                "ALTER TABLE agents ADD COLUMN rd_blitz REAL NOT NULL DEFAULT 350",
                 "ALTER TABLE agents ADD COLUMN last_game REAL NOT NULL DEFAULT 0",
-                "ALTER TABLE matches ADD COLUMN mode TEXT NOT NULL DEFAULT '1v1'"):
+                "ALTER TABLE agents ADD COLUMN coins INTEGER NOT NULL DEFAULT 100",
+                "ALTER TABLE matches ADD COLUMN mode TEXT NOT NULL DEFAULT '1v1'",
+                "ALTER TABLE matches ADD COLUMN coach_a TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE matches ADD COLUMN coach_b TEXT NOT NULL DEFAULT ''"):
         try:
             con.execute(ddl)
         except Exception:
@@ -82,13 +98,16 @@ def leaderboard(mode: str = "1v1"):
     con = connect()
     if mode == "squad":
         rows = con.execute("SELECT name,preset,elo_squad AS elo,games_squad AS games,rd_squad AS rd FROM agents ORDER BY elo_squad DESC").fetchall()
+    elif mode == "blitz":
+        rows = con.execute("SELECT name,preset,elo_blitz AS elo,games_blitz AS games,rd_blitz AS rd FROM agents ORDER BY elo_blitz DESC").fetchall()
     else:
         rows = con.execute("SELECT name,preset,elo,games,rd FROM agents ORDER BY elo DESC").fetchall()
     con.close()
     return [dict(r) for r in rows]
 
 
-def enqueue(a: str, b: str, seed: int | None = None, mode: str = "1v1"):
+def enqueue(a: str, b: str, seed: int | None = None, mode: str = "1v1",
+            coach_a: dict | None = None, coach_b: dict | None = None):
     if a == b:
         raise ValueError("usa due nomi diversi (es. bot-greedy e bot-greedy2) anche se stesso preset")
     # 20% seed nascosti: seed alto random non comunicato prima (qui solo flag concettuale)
@@ -96,8 +115,10 @@ def enqueue(a: str, b: str, seed: int | None = None, mode: str = "1v1"):
         seed = random.randrange(1_000_000)
     con = connect()
     cur = con.execute(
-        "INSERT INTO matches(a,b,seed,status,mode,created) VALUES(?,?,?,?,?,?)",
-        (a, b, seed, "pending", mode, time.time()))
+        "INSERT INTO matches(a,b,seed,status,mode,coach_a,coach_b,created) VALUES(?,?,?,?,?,?,?,?)",
+        (a, b, seed, "pending", mode,
+         json.dumps(coach_a) if coach_a else "", json.dumps(coach_b) if coach_b else "",
+         time.time()))
     mid = cur.lastrowid
     con.commit()
     con.close()
@@ -116,9 +137,19 @@ def finish_match(mid: int, winner: int, s0: int, s1: int, h: str):
     con.execute("UPDATE matches SET status='done',winner=?,s0=?,s1=?,hash=? WHERE id=?",
                 (winner, s0, s1, h, mid))
     m = con.execute("SELECT * FROM matches WHERE id=?", (mid,)).fetchone()
+    if m["mode"] == "daily":
+        # puzzle giornaliero: niente Elo, solo classifica score (1 submit/giorno già garantito all'enqueue)
+        con.commit()
+        con.close()
+        daily_submit(m["a"], s0)
+        if m["b"] != "daily-rival":
+            daily_submit(m["b"], s1)
+        settle_bets(mid, winner)
+        return
     squad = (m["mode"] == "squad")
-    ecol, gcol = ("elo_squad", "games_squad") if squad else ("elo", "games")
-    rdcol = "rd_squad" if squad else "rd"
+    blitz = (m["mode"] == "blitz")
+    ecol, gcol = ("elo_squad", "games_squad") if squad else (("elo_blitz", "games_blitz") if blitz else ("elo", "games"))
+    rdcol = "rd_squad" if squad else ("rd_blitz" if blitz else "rd")
     import time as _t
     now = _t.time()
     # Elo + Glicko-RD: RD cresce con l'inattività (max 350), cala giocando (min 30).
@@ -140,6 +171,7 @@ def finish_match(mid: int, winner: int, s0: int, s1: int, h: str):
                     (new_elo, new_rd, now, name))
     con.commit()
     con.close()
+    settle_bets(mid, winner)
 
 
 def fork_agent(src: str, new_name: str):
@@ -206,6 +238,88 @@ def pending_count() -> int:
     row = con.execute("SELECT COUNT(*) c FROM matches WHERE status='pending'").fetchone()
     con.close()
     return row["c"]
+
+
+def daily_seed() -> tuple[str, int]:
+    """Seed unico del giorno per tutti: YYYYMMDD -> deterministico."""
+    import datetime
+    day = datetime.date.today().isoformat()
+    seed = int(day.replace("-", "")) % 100000
+    return day, seed
+
+
+def daily_submit(name: str, score: int) -> bool:
+    """1 submit/giorno per agente. Ritorna False se già presente."""
+    day, _ = daily_seed()
+    con = connect()
+    try:
+        con.execute("INSERT INTO daily(day,name,score) VALUES(?,?,?)", (day, name, score))
+        con.commit()
+        ok = True
+    except Exception:
+        ok = False
+    con.close()
+    return ok
+
+
+def daily_board(limit: int = 20):
+    day, seed = daily_seed()
+    con = connect()
+    rows = con.execute("SELECT name,score FROM daily WHERE day=? ORDER BY score DESC LIMIT ?",
+                       (day, limit)).fetchall()
+    con.close()
+    return {"day": day, "seed": seed, "board": [dict(r) for r in rows]}
+
+
+def coins_of(name: str) -> int:
+    con = connect()
+    row = con.execute("SELECT coins FROM agents WHERE name=?", (name,)).fetchone()
+    con.close()
+    return row["coins"] if row else 0
+
+
+def place_bet(mid: int, bettor: str, pick: str, amount: int):
+    """Scommessa coin finte sul vincitore ('a' o 'b'). Pari-mutuel al settle."""
+    if pick not in ("a", "b") or amount <= 0:
+        raise ValueError("pick a|b, amount > 0")
+    con = connect()
+    m = con.execute("SELECT * FROM matches WHERE id=?", (mid,)).fetchone()
+    if not m or m["status"] != "pending":
+        raise ValueError("match inesistente o già giocato")
+    if m["a"] != bettor and m["b"] != bettor:
+        pass  # chiunque può puntare, anche non giocatori
+    ag = con.execute("SELECT coins FROM agents WHERE name=?", (bettor,)).fetchone()
+    if not ag or ag["coins"] < amount:
+        con.close()
+        raise ValueError("coin insufficienti (100 gratis a ogni agente)")
+    con.execute("UPDATE agents SET coins=coins-? WHERE name=?", (amount, bettor))
+    cur = con.execute("INSERT INTO bets(mid,bettor,pick,amount) VALUES(?,?,?,?)",
+                      (mid, bettor, pick, amount))
+    bid = cur.lastrowid
+    con.commit()
+    con.close()
+    return bid
+
+
+def settle_bets(mid: int, winner: int):
+    """Pari-mutuel: i vincitori si spartiscono il piatto in proporzione."""
+    if winner not in (0, 1):
+        return
+    win_pick = "a" if winner == 0 else "b"
+    con = connect()
+    bets = [dict(r) for r in con.execute("SELECT * FROM bets WHERE mid=? AND settled=0", (mid,))]
+    if not bets:
+        con.close()
+        return
+    pot = sum(b["amount"] for b in bets)
+    win_tot = sum(b["amount"] for b in bets if b["pick"] == win_pick)
+    for b in bets:
+        if b["pick"] == win_pick and win_tot > 0:
+            prize = round(pot * b["amount"] / win_tot)
+            con.execute("UPDATE agents SET coins=coins+? WHERE name=?", (prize, b["bettor"]))
+        con.execute("UPDATE bets SET settled=1 WHERE id=?", (b["id"],))
+    con.commit()
+    con.close()
 
 
 def token_for_discord(discord_id: str, username: str) -> str:

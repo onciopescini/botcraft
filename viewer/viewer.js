@@ -144,6 +144,20 @@ const wallGeo = new THREE.BoxGeometry(0.9, 0.9, 0.9);
 const wallMat = new THREE.MeshStandardMaterial({ color: 0xc9a06a });
 const goldGeo = new THREE.OctahedronGeometry(0.45);
 const goldMat = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0x554400 });
+// sudden death: anello rosso = fuori zona sicura (raggio dal replay, centro totem)
+const gasMat = new THREE.MeshBasicMaterial({ color: 0xff2222, transparent: true, opacity: 0.16, side: THREE.DoubleSide });
+const gasMesh = new THREE.Mesh(new THREE.RingGeometry(0.93, 1.0, 72), gasMat);
+gasMesh.rotation.x = -Math.PI / 2;
+gasMesh.visible = false;
+scene.add(gasMesh);
+// ping coach: diamante oro sulla cella indicata
+const pingGeo = new THREE.OctahedronGeometry(0.5);
+const pingMat1 = new THREE.MeshBasicMaterial({ color: 0x4da3ff });
+const pingMat2 = new THREE.MeshBasicMaterial({ color: 0xff5d5d });
+const ping1 = new THREE.Mesh(pingGeo, pingMat1);
+const ping2 = new THREE.Mesh(pingGeo, pingMat2);
+ping1.visible = ping2.visible = false;
+scene.add(ping1, ping2);
 // particelle leggere: pool di cubetti riusati (gather verde/grigio/oro, KO arancione)
 const partGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16);
 const parts = [];
@@ -329,6 +343,24 @@ function drawFrame(a, b, alpha) {
     m.position.set(x, 0.5, z);
     dyn.add(m);
   }
+  // zona death + ping coach dal replay
+  const gas = (typeof a.gas === 'number') ? a.gas : 99;
+  if (gas < 90) {
+    const [tx, tz] = xz(16, 16);
+    gasMesh.visible = true;
+    gasMesh.position.set(tx, 0.06, tz);
+    gasMesh.scale.set(gas, gas, 1);
+  } else gasMesh.visible = false;
+  const showPing = (mesh, c, tick) => {
+    if (c && typeof c.x === 'number' && tick >= c.tick) {
+      const [x, z] = xz(c.x, c.y);
+      mesh.visible = true;
+      mesh.position.set(x, 0.6 + 0.2 * Math.sin(performance.now() / 300), z);
+      mesh.rotation.y += 0.05;
+    } else mesh.visible = false;
+  };
+  showPing(ping1, a.c1, a.tick);
+  showPing(ping2, a.c2, a.tick);
   for (const key of (a.walls || [])) {
     const [wx, wy] = key.split(',').map(Number);
     const [x, z] = xz(wx, wy);

@@ -18,7 +18,7 @@ Pagine: `site/index.html` landing · `viewer/` replay 3D · `viewer/leaderboard.
 - **Ritmo:** tick 2/sec, 300 tick 1v1/squad, 500 tick stagioni mondo
 - **Agenti:** Codice Python + LLM BYOK OpenRouter (6000 token/match, fallback codice)
 - **Grafica:** sim headless autorevole, viewer 3D/2D solo replay (skin, particelle, slow-mo KO, clip webm, minimappa, camera follow/orbita)
-- **Modalità:** 1v1 + squadre 3v3 + FFA persistente, Elo separati, leghe code-only/open, tornei bracket + caster AI
+- **Modalità:** 1v1 + blitz 60 tick + squadre 3v3 + daily seed + FFA persistente, Elo separati + Glicko-RD, leghe code-only/open, tornei bracket + caster AI, scommesse finte, coach ping, sudden death
 
 ## Indice documentazione
 Tutto in `docs/`:
