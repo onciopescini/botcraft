@@ -47,6 +47,12 @@ def health():
     return {"ok": True, "game": "botcraft"}
 
 
+@app.get("/")
+def root():
+    return {"game": "botcraft", "health": "/health", "docs": "/docs",
+            "leaderboard": "/leaderboard", "viewer": "vedi repo /viewer e /site"}
+
+
 class AgentIn(BaseModel):
     name: str
     preset: str  # random|greedy|llm-greedy|jev-greedy|squad in S2
