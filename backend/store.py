@@ -42,6 +42,9 @@ def init():
     con.commit()
     for ddl in ("ALTER TABLE agents ADD COLUMN elo_squad REAL NOT NULL DEFAULT 1200",
                 "ALTER TABLE agents ADD COLUMN games_squad INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE agents ADD COLUMN rd REAL NOT NULL DEFAULT 350",
+                "ALTER TABLE agents ADD COLUMN rd_squad REAL NOT NULL DEFAULT 350",
+                "ALTER TABLE agents ADD COLUMN last_game REAL NOT NULL DEFAULT 0",
                 "ALTER TABLE matches ADD COLUMN mode TEXT NOT NULL DEFAULT '1v1'"):
         try:
             con.execute(ddl)
@@ -52,7 +55,7 @@ def init():
 
 
 def register_agent(name: str, preset: str):
-    assert preset in ("random", "greedy", "llm-greedy", "squad", "jev-greedy"), "preset: random|greedy|llm-greedy|squad|jev-greedy"
+    assert preset in ("random", "greedy", "llm-greedy", "squad", "jev-greedy", "bt"), "preset: random|greedy|llm-greedy|squad|jev-greedy|bt"
     con = connect()
     try:
         con.execute("INSERT INTO agents(name,preset) VALUES(?,?)", (name, preset))
@@ -74,9 +77,9 @@ def get_agent(name: str):
 def leaderboard(mode: str = "1v1"):
     con = connect()
     if mode == "squad":
-        rows = con.execute("SELECT name,preset,elo_squad AS elo,games_squad AS games FROM agents ORDER BY elo_squad DESC").fetchall()
+        rows = con.execute("SELECT name,preset,elo_squad AS elo,games_squad AS games,rd_squad AS rd FROM agents ORDER BY elo_squad DESC").fetchall()
     else:
-        rows = con.execute("SELECT name,preset,elo,games FROM agents ORDER BY elo DESC").fetchall()
+        rows = con.execute("SELECT name,preset,elo,games,rd FROM agents ORDER BY elo DESC").fetchall()
     con.close()
     return [dict(r) for r in rows]
 
@@ -111,16 +114,26 @@ def finish_match(mid: int, winner: int, s0: int, s1: int, h: str):
     m = con.execute("SELECT * FROM matches WHERE id=?", (mid,)).fetchone()
     squad = (m["mode"] == "squad")
     ecol, gcol = ("elo_squad", "games_squad") if squad else ("elo", "games")
-    # Elo: winner 0 -> a vince, 1 -> b vince, -1 draw
+    rdcol = "rd_squad" if squad else "rd"
+    import time as _t
+    now = _t.time()
+    # Elo + Glicko-RD: RD cresce con l'inattività (max 350), cala giocando (min 30).
+    # K scalato da RD: rientranti si muovono in fretta, grinder stabili.
     for name, score in ((m["a"], 1.0 if winner == 0 else 0.5 if winner == -1 else 0.0),
                         (m["b"], 1.0 if winner == 1 else 0.5 if winner == -1 else 0.0)):
         ag = con.execute("SELECT * FROM agents WHERE name=?", (name,)).fetchone()
         opp_name = m["b"] if name == m["a"] else m["a"]
         opp = con.execute("SELECT * FROM agents WHERE name=?", (opp_name,)).fetchone()
-        k = 32 if ag[gcol] < 20 else 16
+        idle_days = max(0.0, (now - (ag["last_game"] or now)) / 86400)
+        rd = min(350.0, max(30.0, ag[rdcol] + idle_days * 12.0))
+        base_k = 32 if ag[gcol] < 20 else 16
+        k = base_k * (rd / 150.0)
+        k = max(8.0, min(64.0, k))
         exp = 1.0 / (1.0 + 10 ** ((opp[ecol] - ag[ecol]) / 400))
         new_elo = ag[ecol] + k * (score - exp)
-        con.execute(f"UPDATE agents SET {ecol}=?,{gcol}={gcol}+1 WHERE name=?", (new_elo, name))
+        new_rd = max(30.0, rd * 0.92)
+        con.execute(f"UPDATE agents SET {ecol}=?,{gcol}={gcol}+1,{rdcol}=?,last_game=? WHERE name=?",
+                    (new_elo, new_rd, now, name))
     con.commit()
     con.close()
 

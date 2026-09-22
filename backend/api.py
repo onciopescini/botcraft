@@ -55,7 +55,7 @@ def root():
 
 class AgentIn(BaseModel):
     name: str
-    preset: str  # random|greedy|llm-greedy|jev-greedy|squad in S2
+    preset: str  # random|greedy|llm-greedy|jev-greedy|squad|bt in S2
 
 
 class MatchIn(BaseModel):
@@ -68,8 +68,8 @@ class MatchIn(BaseModel):
 @app.post("/agents")
 def post_agent(inp: AgentIn, req: Request):
     tok = require_token(req)
-    if inp.preset not in ("random", "greedy", "llm-greedy", "jev-greedy", "squad", "squad"):
-        return {"error": "preset deve essere random|greedy|llm-greedy|jev-greedy|squad"}
+    if inp.preset not in ("random", "greedy", "llm-greedy", "jev-greedy", "squad", "bt", "squad"):
+        return {"error": "preset deve essere random|greedy|llm-greedy|jev-greedy|squad|bt"}
     ag = register_agent(inp.name.strip(), inp.preset)
     ag = register_agent(inp.name.strip(), inp.preset)
     record_use(tok)

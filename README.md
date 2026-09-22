@@ -39,7 +39,7 @@ Tutto in `docs/`:
 14. `14_DEPLOY.md` — itch.io + Cloudflare Pages + Render gratis, checklist lancio
 
 ## Cervelli disponibili (preset ladder)
-random · greedy · llm-greedy (OpenRouter BYOK) · **jev-greedy (TypeSafe Jev tattico ogni tick, early access)** · squad (3v3)
+random · greedy · llm-greedy (OpenRouter BYOK) · **jev-greedy (TypeSafe Jev tattico ogni tick, early access)** · squad (3v3) · bt (behavior-tree didattico)
 
 ## Pagine web
 - `site/index.html` — landing con hero, CTA, top-5 live
