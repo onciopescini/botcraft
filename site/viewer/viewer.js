@@ -142,12 +142,14 @@ const elLabel = document.getElementById('ticklabel');
 const elStats = document.getElementById('stats');
 const elPlay = document.getElementById('play');
 
-function parseReplay(text) {
+function parseReplay(text, name) {
   frames = text.trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
   tFloat = 0;
   prevHp = null;
   prevSnap = null;
   slowmoUntil = 0;
+  document.getElementById('stats').classList.remove('loading');
+  document.getElementById('src').textContent = name || 'replay caricato';
   // top-moment: primo KO, altrimenti tick del danno singolo max
   topTick = 0;
   let best = 0;
@@ -336,7 +338,7 @@ let camMode = 'orbit';
 
 document.getElementById('file').addEventListener('change', async (e) => {
   const f = e.target.files[0];
-  if (f) parseReplay(await f.text());
+  if (f) parseReplay(await f.text(), f.name);
 });
 document.getElementById('demo').addEventListener('click', async () => {
   // funziona se servi la root: python -m http.server
@@ -344,14 +346,14 @@ document.getElementById('demo').addEventListener('click', async () => {
   for (const u of candidates) {
     try {
       const r = await fetch(u);
-      if (r.ok) { parseReplay(await r.text()); return; }
+      if (r.ok) { parseReplay(await r.text(), 'demo seed 1'); return; }
     } catch {}
   }
-  alert('demo non trovata: avvia `python -m http.server` nella root oppure carica un replay.jsonl a mano');
+  document.getElementById('stats').textContent = 'demo non trovata: avvia `python -m http.server` nella root oppure carica un replay.jsonl a mano';
 });
 elPlay.addEventListener('click', () => {
   playing = !playing;
-  elPlay.textContent = playing ? '⏸ pausa' : '▶ play';
+  elPlay.textContent = playing ? 'pausa' : 'play';
 });
 document.getElementById('speed').addEventListener('change', (e) => { speed = Number(e.target.value); });
 elTick.addEventListener('input', () => { tFloat = Number(elTick.value); });
@@ -378,14 +380,14 @@ document.getElementById('clip').addEventListener('click', (e) => {
       a.href = url;
       a.download = `botcraft-${Date.now()}.webm`;
       a.click();
-      btn.textContent = 'registra clip 15s';
+      btn.textContent = 'clip 15s';
     };
     rec.start();
     btn.textContent = 'registro… 15s';
     setTimeout(() => rec.state !== 'inactive' && rec.stop(), 15000);
   } catch (err) {
     btn.textContent = 'clip non supportata qui';
-    setTimeout(() => btn.textContent = 'registra clip 15s', 2000);
+    setTimeout(() => btn.textContent = 'clip 15s', 2000);
   }
 });
 document.getElementById('share').addEventListener('click', () => {  navigator.clipboard.writeText(location.href);
@@ -405,7 +407,8 @@ document.getElementById('share').addEventListener('click', () => {  navigator.cl
   for (const u of candidates) {
     try {
       const r = await fetch(u);
-      if (r.ok) { parseReplay(await r.text()); return; }
+      if (r.ok) { parseReplay(await r.text(), 'match ' + q); return; }
     } catch {}
   }
+  document.getElementById('stats').textContent = `replay ${q} non trovato qui: aprilo da ladder o caricalo a mano`;
 })();

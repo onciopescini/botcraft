@@ -3,17 +3,35 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Botcraft — Replay 3D S1</title>
+<title>Botcraft — replay 3D</title>
 <style>
-  body { margin:0; font-family: system-ui, sans-serif; background:#0b0e14; color:#e6e6e6; }
-  #ui { position:fixed; left:12px; top:12px; background:#141a26ee; padding:12px; border-radius:10px; max-width:320px; }
-  #ui h1 { font-size:16px; margin:0 0 8px; }
-  #ui .row { margin:8px 0; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  button, select { background:#24314d; color:#fff; border:1px solid #3a4c72; border-radius:6px; padding:6px 10px; cursor:pointer; }
-  #tick { width:100%; }
-  #stats { font-size:12px; line-height:1.5; white-space:pre-wrap; }
+  :root { --panel:#141a26f2; --line:#3a4c72; --blu:#4da3ff; --oro:#ffd700; }
+  body { margin:0; font-family:system-ui,-apple-system,sans-serif; background:#0b0e14; color:#e6e6e6; }
   #c { display:block; width:100vw; height:100vh; }
-  .hint { font-size:11px; opacity:.7; }
+  #ui { position:fixed; left:12px; top:12px; width:336px; max-height:calc(100vh - 24px); overflow-y:auto;
+        background:var(--panel); border:1px solid #24314d; border-radius:14px; padding:14px; backdrop-filter:blur(8px); }
+  #ui h1 { font-size:15px; margin:0; }
+  #ui h1 small { display:block; font-weight:400; font-size:11px; opacity:.65; margin-top:2px; }
+  #ui nav { font-size:12px; margin:8px 0 2px; }
+  #ui nav a { color:#7db4ff; margin-right:10px; text-decoration:none; }
+  section { border-top:1px solid #24314d; margin-top:10px; padding-top:10px; }
+  section > h2 { font-size:11px; text-transform:uppercase; letter-spacing:.1em; opacity:.6; margin:0 0 8px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:6px 0; }
+  button, select { background:#24314d; color:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 12px; cursor:pointer; font-size:13px; }
+  button:hover, select:hover { border-color:var(--blu); }
+  button.primary { background:var(--oro); color:#141414; border-color:var(--oro); font-weight:700; }
+  input[type=file] { font-size:12px; max-width:100%; }
+  input[type=file]::file-selector-button { background:#24314d; color:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 12px; cursor:pointer; }
+  #tick { width:100%; accent-color:var(--oro); }
+  #ticklabel { font-size:12px; font-variant-numeric:tabular-nums; }
+  #stats { font-size:12px; line-height:1.55; white-space:pre-wrap; background:#0b0e14; border-radius:8px; padding:8px; min-height:64px; }
+  #stats.loading { opacity:.55; }
+  #mini, #graph { border:1px solid var(--line); border-radius:8px; }
+  .hint { font-size:11px; opacity:.65; }
+  @media (max-width:700px) {
+    #ui { left:8px; right:8px; top:auto; bottom:8px; width:auto; max-height:46vh; }
+    #c { height:100vh; }
+  }
 </style>
 <script type="importmap">
 { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
@@ -22,23 +40,37 @@
 <body>
 <canvas id="c"></canvas>
 <div id="ui">
-  <h1>Botcraft — replay 3D (S1)</h1>
-  <div class="row">
-    <input type="file" id="file" accept=".jsonl,.json"/>
-    <button id="demo">demo seed 1</button>
-    <a href="./leaderboard.html" style="color:#7db4ff;font-size:12px;">ladder</a>
-  </div>
-  <div class="row">
-    <button id="play">⏸ pausa</button>
-    <button id="cam">camera: orbita</button>
-    <select id="speed"><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option></select>
-    <span id="ticklabel">tick 0/0</span>
-  </div>
-  <div class="row"><input type="range" id="tick" min="0" max="0" value="0"/></div>
-  <div id="stats">carica un replay.jsonl…</div>
-  <div class="row"><canvas id="mini" width="128" height="128" style="border:1px solid #3a4c72;border-radius:6px;"></canvas><canvas id="graph" width="160" height="128" style="border:1px solid #3a4c72;border-radius:6px;"></canvas></div>
-  <div class="row"><button id="share">copia share link</button><button id="clip">registra clip 15s</button><button id="top">vai al top-moment</button></div>
-  <div class="hint">Servi con <code>python -m http.server</code> nella root per usare demo, oppure apri file a mano. Il viewer non calcola logica, legge solo replay.</div>
+  <h1>Botcraft — replay 3D<small id="src">nessun replay caricato</small></h1>
+  <nav><a href="./leaderboard.html">ladder</a><a href="./tournament.html">tornei</a><a href="../">home</a></nav>
+  <section>
+    <h2>Replay</h2>
+    <div class="row">
+      <input type="file" id="file" accept=".jsonl,.json"/>
+    </div>
+    <div class="row">
+      <button id="demo" class="primary">demo seed 1</button>
+      <button id="top">top-moment</button>
+    </div>
+  </section>
+  <section>
+    <h2>Playback <span id="ticklabel">tick 0/0</span></h2>
+    <div class="row"><input type="range" id="tick" min="0" max="0" value="0"/></div>
+    <div class="row">
+      <button id="play">pausa</button>
+      <button id="cam">camera: orbita</button>
+      <select id="speed" aria-label="velocità"><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option></select>
+    </div>
+  </section>
+  <section>
+    <h2>Stato</h2>
+    <div id="stats" class="loading">carica un replay per iniziare…</div>
+    <div class="row"><canvas id="mini" width="128" height="128"></canvas><canvas id="graph" width="160" height="128"></canvas></div>
+  </section>
+  <section>
+    <h2>Condividi</h2>
+    <div class="row"><button id="share">copia share link</button><button id="clip">clip 15s</button></div>
+    <p class="hint">Il viewer non calcola logica: legge solo replay versionati v1/v2.</p>
+  </section>
 </div>
 <script type="module" src="./viewer.js"></script>
 </body>

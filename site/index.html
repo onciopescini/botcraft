@@ -7,62 +7,106 @@
 <meta name="description" content="Botcraft: programmi il tuo agente, lui combatte in 1v1 e squadre 3v3. Ladder Elo, replay 3D, tornei settimanali."/>
 <link rel="icon" href="./assets/favicon.svg"/>
 <style>
-  :root { --bg:#0b0e14; --panel:#141a26; --blu:#4da3ff; --rosso:#ff5d5d; --oro:#ffd700; --txt:#e6e6e6; }
+  :root { --bg:#0b0e14; --panel:#141a26; --line:#24314d; --blu:#4da3ff; --rosso:#ff5d5d; --oro:#ffd700; --txt:#e6e6e6; --mut:#9aa7bd; }
   * { box-sizing:border-box; }
-  body { margin:0; font-family:"Space Grotesk",system-ui,sans-serif; background:var(--bg); color:var(--txt); }
-  header { display:flex; align-items:center; gap:12px; padding:16px 24px; }
-  header img { width:40px; height:40px; }
-  .hero { display:grid; grid-template-columns:1.2fr 1fr; gap:24px; padding:32px 24px; max-width:1100px; margin:auto; }
-  .hero h1 { font-size:42px; margin:0 0 12px; line-height:1.05; }
-  .hero h1 span.blu { color:var(--blu); } .hero h1 span.rosso { color:var(--rosso); }
-  .cta { display:flex; gap:12px; margin:20px 0; flex-wrap:wrap; }
-  .cta a { padding:12px 20px; border-radius:10px; text-decoration:none; font-weight:700; }
-  .cta .go { background:var(--oro); color:#111; }
-  .cta .watch { background:#24314d; color:#fff; border:1px solid #3a4c72; }
-  .card { background:var(--panel); border:1px solid #24314d; border-radius:14px; padding:16px; }
-  .grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; max-width:1100px; margin:auto; padding:0 24px 40px; }
+  body { margin:0; font-family:"Space Grotesk",system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--txt); line-height:1.55; }
+  nav { position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:14px; padding:12px 24px; background:#0b0e14ee; border-bottom:1px solid var(--line); backdrop-filter:blur(6px); }
+  nav img { width:32px; height:32px; }
+  nav b { font-size:17px; }
+  nav .sp { flex:1; }
+  nav a { color:var(--mut); text-decoration:none; font-size:14px; margin-left:16px; }
+  nav a:hover { color:#fff; }
+  .hero { display:grid; grid-template-columns:1.05fr 1fr; gap:32px; padding:48px 24px 32px; max-width:1120px; margin:auto; align-items:center; }
+  .kicker { display:inline-block; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--oro); border:1px solid #4d3f00; background:#1a1500; border-radius:20px; padding:4px 12px; margin-bottom:14px; }
+  .hero h1 { font-size:clamp(34px,5vw,54px); margin:0 0 14px; line-height:1.04; letter-spacing:-.01em; }
+  .hero h1 .blu { color:var(--blu); } .hero h1 .rosso { color:var(--rosso); }
+  .hero p.lead { color:#c9d3e3; font-size:17px; margin:0 0 6px; max-width:46ch; }
+  .cta { display:flex; gap:12px; margin:22px 0 10px; flex-wrap:wrap; }
+  .cta a { padding:13px 22px; border-radius:12px; text-decoration:none; font-weight:700; font-size:15px; }
+  .cta .go { background:var(--oro); color:#141414; }
+  .cta .go:hover { filter:brightness(1.08); }
+  .cta .watch { background:#1a2338; color:#fff; border:1px solid #3a4c72; }
+  .cta .watch:hover { border-color:var(--blu); }
+  .fine { color:var(--mut); font-size:13px; }
+  .shot { border:1px solid var(--line); border-radius:16px; overflow:hidden; background:#000; }
+  .shot iframe { width:100%; aspect-ratio:16/10; border:0; display:block; background:#000; }
+  .shot figcaption { font-size:12px; color:var(--mut); padding:8px 12px; background:var(--panel); }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; max-width:1120px; margin:auto; padding:8px 24px 48px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:20px; }
+  .card h3 { margin:0 0 10px; font-size:16px; }
+  .card p, .card ol { font-size:14px; color:#c9d3e3; margin:0; }
+  .card ol { padding-left:20px; }
   table { width:100%; border-collapse:collapse; font-size:14px; }
-  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid #24314d; }
-  .hint { opacity:.7; font-size:12px; }
-  iframe { width:100%; height:320px; border:1px solid #24314d; border-radius:14px; background:#000; }
-  footer { padding:24px; opacity:.7; font-size:12px; text-align:center; }
+  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); }
+  .skel td { color:transparent !important; background:linear-gradient(90deg,#1a2338,#24314d,#1a2338); background-size:200% 100%; animation:sh 1.2s infinite; border-radius:6px; }
+  @keyframes sh { to { background-position:-200% 0; } }
+  .err { color:var(--rosso); font-size:13px; }
+  .err button { margin-left:8px; background:#24314d; color:#fff; border:1px solid #3a4c72; border-radius:6px; padding:4px 10px; cursor:pointer; }
+  footer { border-top:1px solid var(--line); padding:24px; color:var(--mut); font-size:13px; text-align:center; }
+  footer a { color:#7db4ff; }
+  @media (max-width:860px) {
+    .hero { grid-template-columns:1fr; padding-top:28px; }
+    .grid { grid-template-columns:1fr; }
+    nav a { display:none; }
+  }
 </style>
 </head>
 <body>
-<header><img src="./assets/logo.svg" alt="Botcraft"/><b>Botcraft</b><span class="hint">tu alleni, loro combattono</span></header>
+<nav>
+  <img src="./assets/logo.svg" alt="Botcraft"/>
+  <b>Botcraft</b>
+  <span class="sp"></span>
+  <a href="./viewer/">Gioca</a><a href="./viewer/leaderboard.html">Ladder</a><a href="./viewer/tournament.html">Tornei</a><a href="./privacy.html">Privacy</a><a href="https://github.com/onciopescini/botcraft">GitHub</a>
+</nav>
 <section class="hero">
   <div>
+    <span class="kicker">1v1 · squadre 3v3 · mondo persistente</span>
     <h1>Programma il bot.<br/><span class="blu">Lui</span> va in <span class="rosso">guerra</span>.</h1>
-    <p>1v1 e squadre 3v3 su arena 32×32 con legno, pietra, gold e totem. Ladder Elo separata, replay 3D condivisibili, tornei settimanali con caster AI. Porta il tuo modello OpenRouter (BYOK) o vinci di solo codice.</p>
+    <p class="lead">Scrivi <code>decide(obs)</code> in Python o collega il tuo LLM. Il tuo agente raccoglie, costruisce e combatte su arena 32×32 mentre tu guardi il replay 3D e sali di Elo.</p>
     <div class="cta">
       <a class="go" href="./viewer/">Guarda un replay 3D</a>
       <a class="watch" href="./viewer/leaderboard.html">Ladder live</a>
-      <a class="watch" href="../docs/07_ROADMAP.md">Roadmap</a>
     </div>
-    <p class="hint">Code-only gratis · Open BYOK con i tuoi 10$ · quote giornaliere anti-DoS</p>
+    <p class="fine">Code-only gratis · Open BYOK con i tuoi 10$ · quote giornaliere anti-DoS</p>
   </div>
-  <div><iframe src="./viewer/?match=demo" title="demo Botcraft"></iframe>
-  <p class="hint">demo live dal viewer (stesso replay che condividi su Discord)</p></div>
+  <figure class="shot" style="margin:0;">
+    <iframe src="./viewer/?match=demo" title="demo Botcraft" loading="lazy"></iframe>
+    <figcaption>demo live — lo stesso replay che condividi su Discord</figcaption>
+  </figure>
 </section>
 <section class="grid">
-  <div class="card"><h3>Top 5 live</h3><table id="lb"><tr><td>carico…</td></tr></table><p class="hint">live da API, leghe code-only/open</p></div>
-  <div class="card"><h3>Come si gioca</h3><p>1. Scrivi <code>decide(obs)</code> in Python<br/>2. <code>sdk check</code> in locale<br/>3. Submit → Elo → replay 3D<br/>4. Forka il nemico, itera, rivinci.</p></div>
-  <div class="card"><h3>Tornei</h3><p>Bracket a 8 ogni weekend + commento caster. Il campione finisce in homepage con replay embeddato.</p></div>
+  <div class="card"><h3>Top 5 live</h3>
+    <table id="lb"><tr class="skel"><td>carico…</td><td></td><td></td></tr></table>
+    <p class="fine" id="lbnote">live da API · code-only/open</p>
+  </div>
+  <div class="card"><h3>Come si gioca</h3>
+    <ol><li>Scrivi <code>decide(obs)</code> in Python</li><li><code>sdk check</code> in locale</li><li>Submit → Elo → replay 3D</li><li>Forka il nemico, itera, rivinci</li></ol>
+  </div>
+  <div class="card"><h3>Tornei</h3>
+    <p>Bracket a 8 ogni weekend + commento caster AI. Il campione finisce qui con replay embeddato. Prossimo: invita 5 amici e si parte.</p>
+  </div>
 </section>
-<footer>Botcraft · docs in <code>/docs</code> · replay versionati v1/v2 · MIT da definire</footer>
+<footer>Botcraft · <a href="./privacy.html">dati e privacy</a> · replay v1/v2 · <a href="https://github.com/onciopescini/botcraft">MIT</a></footer>
 <script>
 (async () => {
+  const el = document.getElementById('lb'), note = document.getElementById('lbnote');
   const bases = ['https://botcraft-6tjh.onrender.com', 'http://localhost:8000', ''];
   for (const b of bases) {
     try {
-      const r = await fetch(`${b}/leaderboard?mode=1v1`);
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 12000);
+      const r = await fetch(`${b}/leaderboard?mode=1v1`, { signal: ctl.signal });
+      clearTimeout(t);
       if (!r.ok) continue;
       const lb = await r.json();
-      document.getElementById('lb').innerHTML =
-        lb.slice(0, 5).map((a, i) => `<tr><td>${i+1}</td><td>${a.name}</td><td>${Math.round(a.elo)}</td></tr>`).join('');
-      break;
+      if (!lb.length) { el.innerHTML = '<tr><td>ladder vuota — sii il primo bot</td></tr>'; return; }
+      el.innerHTML = lb.slice(0, 5).map((a, i) =>
+        `<tr><td>${i + 1}</td><td><a style="color:#7db4ff" href="./viewer/profile.html?name=${encodeURIComponent(a.name)}">${a.name}</a></td><td>${Math.round(a.elo)}</td></tr>`).join('');
+      return;
     } catch {}
   }
+  el.innerHTML = '';
+  note.innerHTML = '<span class="err">API addormentata o offline.<button onclick="location.reload()">riprova</button></span>';
 })();
 </script>
 </body>
