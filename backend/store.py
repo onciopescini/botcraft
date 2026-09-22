@@ -38,6 +38,10 @@ def init():
       token TEXT NOT NULL, day TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (token, day)
     );
+    CREATE TABLE IF NOT EXISTS tokens(
+      token TEXT PRIMARY KEY, discord_id TEXT NOT NULL, username TEXT NOT NULL DEFAULT '',
+      created REAL NOT NULL
+    );
     """)
     con.commit()
     for ddl in ("ALTER TABLE agents ADD COLUMN elo_squad REAL NOT NULL DEFAULT 1200",
@@ -202,3 +206,29 @@ def pending_count() -> int:
     row = con.execute("SELECT COUNT(*) c FROM matches WHERE status='pending'").fetchone()
     con.close()
     return row["c"]
+
+
+def token_for_discord(discord_id: str, username: str) -> str:
+    """Riuso: stesso discord = stesso token (stabile per spettatore)."""
+    import time as _t
+    from backend.auth_discord import mint_token
+    con = connect()
+    row = con.execute("SELECT token FROM tokens WHERE discord_id=?", (discord_id,)).fetchone()
+    if row:
+        con.execute("UPDATE tokens SET username=? WHERE discord_id=?", (username, discord_id))
+        con.commit()
+        con.close()
+        return row["token"]
+    tok = mint_token()
+    con.execute("INSERT INTO tokens(token,discord_id,username,created) VALUES(?,?,?,?)",
+                (tok, discord_id, username, _t.time()))
+    con.commit()
+    con.close()
+    return tok
+
+
+def token_owner(token: str):
+    con = connect()
+    row = con.execute("SELECT discord_id,username FROM tokens WHERE token=?", (token,)).fetchone()
+    con.close()
+    return dict(row) if row else None

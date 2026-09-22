@@ -21,13 +21,14 @@ TOKENS = {t.strip() for t in os.environ.get("API_TOKENS", "").split(",") if t.st
 
 
 def require_token(req: Request) -> str:
+    from backend.store import token_owner
     if not TOKENS:  # dev locale: aperto
         return "local"
     auth = req.headers.get("authorization", "")
     tok = auth.removeprefix("Bearer ").strip()
-    if tok not in TOKENS:
-        raise HTTPException(401, "serve Bearer token (API_TOKENS)")
-    return tok
+    if tok in TOKENS or token_owner(tok):
+        return tok
+    raise HTTPException(401, "serve Bearer token (API_TOKENS o login Discord)")
 
 app = FastAPI(title="Botcraft S1")
 app.add_middleware(
@@ -294,3 +295,26 @@ def list_seasons():
                 except Exception:
                     pass
     return out[:20]
+
+
+@app.get("/auth/discord/login")
+def discord_login():
+    from backend.auth_discord import enabled, login_url
+    if not enabled():
+        raise HTTPException(501, "login Discord non configurato (DISCORD_* env)")
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(login_url())
+
+
+@app.get("/auth/discord/callback")
+def discord_callback(code: str = ""):
+    from backend.auth_discord import enabled, exchange
+    from backend.store import token_for_discord
+    if not enabled():
+        raise HTTPException(501, "login Discord non configurato (DISCORD_* env)")
+    if not code:
+        raise HTTPException(400, "code mancante")
+    me = exchange(code)
+    tok = token_for_discord(me["discord_id"], me["username"])
+    return {"token": tok, "username": me["username"],
+            "hint": "usalo come Authorization: Bearer nei POST"}

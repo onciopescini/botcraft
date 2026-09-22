@@ -18,11 +18,15 @@ Contesto: utente vuole wow 3D da subito. Decisione: sim resta 2D logica, viewer 
 ## ADR-004: solo 1v1 ladder in S0 — DECISO 21/09/2026
 Contesto: mondo persistente subito = troppo lavoro e sbilanciato. Decisione: 1v1 Elo, mondo in S3. Conseguenza: design arena deve già prevedere muri/memoria per riuso futuro.
 
-## Domande aperte per te (rispondi in chat)
-1. ~~LLM provider~~ -> CHIUSO: BYOK OpenRouter, 10$ consigliati, modelli :free.
-2. ~~Message~~ -> CHIUSO dal team: OFF in S0.
-3. ~~Limite zip~~ -> CHIUSO dal team: 2MB stdlib+numpy.
-4. **Nome progetto:** `Botcraft` — DECISO 21/09/2026. Ex working title `Agent Arena` scartato per genericità/SEO.
-5. **Prossimo task build:** `sim` poi `viewer` — DECISO 21/09/2026 su fiducia team tecnico. Motivo: sim = gioco vero senza immagini, viewer = immagini senza gioco.
+## ADR-007: login Discord spettatori (copiare) — DECISO 22/09/2026
+OAuth2 Discord -> token API riusabile. GET restano aperte, POST richiedono token. Disabilitato senza env (dev locale aperto). Motivo: zero signup custom, community già su Discord.
 
-Rispondi tipo `4-Botcraft, 5-sim` e aggiorno i docs.
+## ADR-008: mobile touch-orbit DOPO login — DECISO 22/09/2026, differito
+Prima login+playtest, poi controlli touch. Viewer già responsive bottom-sheet.
+
+## ADR-009: MAI pay-to-win — DECISO 22/09/2026, permanente
+Solo cosmetici/donazioni. Elo, quote base e leghe mai in vendita. Motivo: la ladder muore il giorno che si compra.
+## Storico domande chiuse
+1. ~~LLM provider~~ -> BYOK OpenRouter. 2. ~~Message~~ -> OFF in S0. 3. ~~Zip~~ -> 2MB stdlib+numpy.
+4. Nome `Botcraft`. 5. Build `sim` poi `viewer`. 6. Copiare/co-nostro + A/B/C -> ADR-007/008/009.
+Domande aperte: nessuna. Backlog in docs/16_RESEARCH.md.
