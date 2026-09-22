@@ -314,7 +314,13 @@ def discord_callback(code: str = ""):
         raise HTTPException(501, "login Discord non configurato (DISCORD_* env)")
     if not code:
         raise HTTPException(400, "code mancante")
-    me = exchange(code)
-    tok = token_for_discord(me["discord_id"], me["username"])
+    try:
+        me = exchange(code)
+    except Exception as e:
+        raise HTTPException(502, f"Discord exchange fallito: {type(e).__name__} (controlla secret e redirect)")
+    try:
+        tok = token_for_discord(me["discord_id"], me["username"])
+    except Exception as e:
+        raise HTTPException(502, f"DB token fallito: {type(e).__name__}")
     return {"token": tok, "username": me["username"],
             "hint": "usalo come Authorization: Bearer nei POST"}
