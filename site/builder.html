@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Botcraft — crea il tuo bot senza codice</title>
+<meta name="description" content="Scegli archetipo e stile, scarica il bot Python pronto e mandalo in arena."/>
+<link rel="icon" href="./assets/favicon.svg"/>
+<style>
+  :root { --bg:#0b0e14; --panel:#141a26; --line:#24314d; --blu:#4da3ff; --oro:#ffd700; --txt:#e6e6e6; --mut:#9aa7bd; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Space Grotesk",system-ui,sans-serif; background:var(--bg); color:var(--txt); line-height:1.55; }
+  nav { display:flex; align-items:center; gap:12px; padding:12px 24px; border-bottom:1px solid var(--line); }
+  nav img { width:32px; height:32px; } nav a { color:var(--mut); text-decoration:none; font-size:14px; margin-left:16px; }
+  main { max-width:1060px; margin:auto; padding:28px 24px 64px; display:grid; grid-template-columns:340px 1fr; gap:20px; }
+  h1 { font-size:30px; margin:0 0 6px; grid-column:1/-1; }
+  .sub { grid-column:1/-1; color:var(--mut); margin:0 0 8px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; }
+  .arch { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .arch button { background:#1a2338; color:#fff; border:1px solid #3a4c72; border-radius:10px; padding:12px 8px; cursor:pointer; font-size:14px; }
+  .arch button.on { border-color:var(--oro); background:#241f08; }
+  .arch small { display:block; font-size:11px; color:var(--mut); }
+  label.slider { display:block; margin:14px 0 4px; font-size:14px; }
+  label.slider output { float:right; color:var(--oro); }
+  input[type=range] { width:100%; accent-color:var(--oro); }
+  .tgl { display:flex; gap:8px; margin:10px 0; font-size:14px; align-items:center; }
+  input[type=text] { width:100%; background:#0b0e14; color:#fff; border:1px solid #3a4c72; border-radius:8px; padding:8px 10px; }
+  pre { background:#0b0e14; border:1px solid var(--line); border-radius:10px; padding:14px; overflow:auto; max-height:420px; font-size:12px; }
+  .cta { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  .cta button, .cta a { padding:11px 18px; border-radius:10px; font-weight:700; font-size:14px; cursor:pointer; text-decoration:none; }
+  .go { background:var(--oro); color:#141414; border:0; }
+  .ghost { background:#1a2338; color:#fff; border:1px solid #3a4c72; }
+  ol.how { font-size:14px; color:#c9d3e3; padding-left:20px; margin:10px 0 0; }
+  @media (max-width:860px) { main { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<nav><img src="./assets/logo.svg" alt=""/><b>Botcraft</b><span style="flex:1"></span><a href="./">home</a><a href="./viewer/">viewer</a><a href="./viewer/leaderboard.html">ladder</a></nav>
+<main>
+  <h1>Crea il tuo bot, zero codice</h1>
+  <p class="sub">Scegli chi è il tuo bot e come gioca. Scarichi Python pronto, lo validi con <code>sdk check</code> e lo mandi in arena. Quando vuoi, apri il file e cambia tutto a mano.</p>
+  <div class="card">
+    <div class="arch" id="arch"></div>
+    <label class="slider">Aggressione <output id="o-ag">50</output><input type="range" id="s-ag" min="0" max="100" value="50"/></label>
+    <label class="slider">Ingordigia (oro prima) <output id="o-gr">50</output><input type="range" id="s-gr" min="0" max="100" value="50"/></label>
+    <label class="slider">Guardia (totem) <output id="o-gu">30</output><input type="range" id="s-gu" min="0" max="100" value="30"/></label>
+    <div class="tgl"><input type="checkbox" id="c-sw" checked/> costruisci la spada</div>
+    <div class="tgl"><input type="checkbox" id="c-tt"/> trash-talk ("ti vedo!")</div>
+    <div class="tgl">nome <input type="text" id="c-name" value="my-bot" maxlength="24"/></div>
+  </div>
+  <div class="card">
+    <pre id="code">…</pre>
+    <div class="cta">
+      <button class="go" id="dl">scarica agent.py</button>
+      <button class="ghost" id="dl2">scarica capabilities.yaml</button>
+    </div>
+    <ol class="how">
+      <li>Scarica i 2 file in una cartella <code>my-bot/</code></li>
+      <li><code>python sdk/check.py my-bot/</code> → "PRONTO PER SUBMIT"</li>
+      <li>Zippali e mandali in arena (o chiedi a un amico coder)</li>
+    </ol>
+  </div>
+</main>
+<script src="./builder-gen.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let arch = 'balanced';
+const NAMES = { balanced: ['Equilibrato', 'Fa tutto bene'], rusher: ['Rusher', 'Caccia col coltello'], farmer: ['Farmer', 'Solo risorse'], turtle: ['Tartaruga', 'Difende il totem'] };
+function paintArch() {
+  $('arch').innerHTML = Object.entries(NAMES).map(([k, [t, d]]) =>
+    `<button data-k="${k}" class="${k === arch ? 'on' : ''}">${t}<small>${d}</small></button>`).join('');
+  document.querySelectorAll('#arch button').forEach(b => b.onclick = () => {
+    arch = b.dataset.k;
+    sync(); paintArch(); render();
+  });
+}
+function cfg() {
+  return {
+    archetype: arch, name: $('c-name').value,
+    aggression: +$('s-ag').value, greed: +$('s-gr').value, guard: +$('s-gu').value,
+    craftSword: $('c-sw').checked, trashTalk: $('c-tt').checked,
+  };
+}
+function sync() {
+  const c = ARCHETYPES[arch];
+  $('s-ag').value = c.aggression; $('s-gr').value = c.greed; $('s-gu').value = c.guard;
+  $('c-sw').checked = c.craftSword; $('c-tt').checked = c.trashTalk;
+}
+function render() {
+  $('o-ag').textContent = $('s-ag').value;
+  $('o-gr').textContent = $('s-gr').value;
+  $('o-gu').textContent = $('s-gu').value;
+  window._last = generateBot(cfg());
+  $('code').textContent = window._last.code;
+}
+function dl(name, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+  a.download = name; a.click();
+}
+['s-ag', 's-gr', 's-gu', 'c-sw', 'c-tt', 'c-name'].forEach(id =>
+  $(id).addEventListener('input', render));
+$('dl').onclick = () => dl('agent.py', window._last.code);
+$('dl2').onclick = () => dl('capabilities.yaml', window._last.yaml);
+paintArch(); sync(); render();
+</script>
+</body>
+</html>
