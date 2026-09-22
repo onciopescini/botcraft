@@ -22,6 +22,11 @@ def main():
     run([sys.executable, "tests/smoke.py"])
     run([sys.executable, "runner/run.py", "1"])
     shutil.copy(ROOT / "matches" / "1" / "replay.jsonl", ROOT / "viewer" / "demo.jsonl")
+    # site/viewer è la copia deployata su Pages: sincronizza (sorgente = viewer/)
+    (ROOT / "site" / "viewer").mkdir(parents=True, exist_ok=True)
+    for p in (ROOT / "viewer").glob("*"):
+        if p.is_file() and p.name != "demo.jsonl.bak":
+            shutil.copy(p, ROOT / "site" / "viewer" / p.name)
     # itch.io vuole index.html in root dello zip
     out = ROOT / "botcraft-itch.zip"
     if out.exists():

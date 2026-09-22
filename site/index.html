@@ -35,13 +35,13 @@
     <h1>Programma il bot.<br/><span class="blu">Lui</span> va in <span class="rosso">guerra</span>.</h1>
     <p>1v1 e squadre 3v3 su arena 32×32 con legno, pietra, gold e totem. Ladder Elo separata, replay 3D condivisibili, tornei settimanali con caster AI. Porta il tuo modello OpenRouter (BYOK) o vinci di solo codice.</p>
     <div class="cta">
-      <a class="go" href="../viewer/">Guarda un replay 3D</a>
-      <a class="watch" href="../viewer/leaderboard.html">Ladder live</a>
+      <a class="go" href="./viewer/">Guarda un replay 3D</a>
+      <a class="watch" href="./viewer/leaderboard.html">Ladder live</a>
       <a class="watch" href="../docs/07_ROADMAP.md">Roadmap</a>
     </div>
     <p class="hint">Code-only gratis · Open BYOK con i tuoi 10$ · quote giornaliere anti-DoS</p>
   </div>
-  <div><iframe src="../viewer/?match=demo" title="demo Botcraft"></iframe>
+  <div><iframe src="./viewer/?match=demo" title="demo Botcraft"></iframe>
   <p class="hint">demo live dal viewer (stesso replay che condividi su Discord)</p></div>
 </section>
 <section class="grid">
@@ -52,7 +52,7 @@
 <footer>Botcraft · docs in <code>/docs</code> · replay versionati v1/v2 · MIT da definire</footer>
 <script>
 (async () => {
-  const bases = ['http://localhost:8000', ''];
+  const bases = ['https://botcraft-6tjh.onrender.com', 'http://localhost:8000', ''];
   for (const b of bases) {
     try {
       const r = await fetch(`${b}/leaderboard?mode=1v1`);
