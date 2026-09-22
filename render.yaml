@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: botcraft-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /leaderboard
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: TYPESAFE_API_KEY
+        sync: false
+      - key: VERCEL_AI_GATEWAY_KEY
+        sync: false
+      - key: JEV_PROVIDER
+        value: vercel
+      - key: API_TOKENS
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://botcraft.pages.dev,https://botcraft.itch.io

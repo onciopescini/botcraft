@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Botcraft — Ladder</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#0b0e14; color:#e6e6e6; margin:0; padding:24px; }
+  h1 { font-size:20px; }
+  .row { display:flex; gap:8px; margin:12px 0; flex-wrap:wrap; align-items:center; }
+  input, select, button { background:#24314d; color:#fff; border:1px solid #3a4c72; border-radius:6px; padding:6px 10px; }
+  table { border-collapse:collapse; width:100%; max-width:640px; }
+  th, td { border-bottom:1px solid #24314d; padding:8px; text-align:left; font-size:14px; }
+  a { color:#7db4ff; }
+  .hint { opacity:.7; font-size:12px; }
+</style>
+</head>
+<body>
+<h1>Botcraft — ladder</h1>
+<div class="row">
+  <label>API <input id="api" value="http://localhost:8000" size="28"/></label>
+  <label>Lega
+    <select id="league"><option value="">tutte</option><option value="code-only">code-only</option><option value="open">open</option></select>
+  </label>
+  <button id="go">aggiorna</button>
+  <a href="./">viewer 3D</a>
+</div>
+<table><thead><tr><th>#</th><th>nome</th><th>preset</th><th>elo</th><th>match</th></tr></thead>
+<tbody id="lb"><tr><td colspan="5">carico…</td></tr></tbody></table>
+<h2>Ultimi match</h2>
+<div id="matches" class="hint">i match appaiono dopo <code>POST /matches</code> + worker. Apri un replay con link share.</div>
+<script>
+const $ = id => document.getElementById(id);
+async function load() {
+  const base = $('api').value.replace(/\/$/, '');
+  const lg = $('league').value ? `?league=${$('league').value}` : '';
+  try {
+    const lb = await (await fetch(`${base}/leaderboard${lg}`)).json();
+    $('lb').innerHTML = lb.map((r, i) =>
+      `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.preset}</td><td>${Math.round(r.elo)}</td><td>${r.games}</td></tr>`).join('') || '<tr><td colspan=5>vuota</td></tr>';
+    // ultimi 8 match: prova id decrescenti (semplice, senza endpoint lista)
+    let html = '';
+    for (let id = 1; id <= 12; id++) {
+      try {
+        const m = await (await fetch(`${base}/matches/${id}`)).json();
+        if (!m || m.error) continue;
+        html = `<div>#${m.id} ${m.a} vs ${m.b} — winner=${m.winner} ${m.s0}-${m.s1} seed=${m.seed} <a href="./?match=ladder-${m.id}" target="_blank">guarda replay</a> <button data-u="${base}/replays/ladder-${m.id}/replay.jsonl">copia link</button></div>` + html;
+      } catch {}
+    }
+    $('matches').innerHTML = html || 'nessun match ancora';
+    document.querySelectorAll('button[data-u]').forEach(b => b.onclick = () => navigator.clipboard.writeText(b.dataset.u));
+  } catch (e) { $('lb').innerHTML = `<tr><td colspan=5>API non raggiungibile: ${e}</td></tr>`; }
+}
+$('go').onclick = load;
+load();
+</script>
+</body>
+</html>

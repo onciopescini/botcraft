@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+matches/
+backend/botcraft.db
+backend/.openrouter_key
+backend/uploads/
+viewer/demo.jsonl

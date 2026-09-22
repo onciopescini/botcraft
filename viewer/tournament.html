@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Botcraft — Torneo</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#0b0e14; color:#e6e6e6; margin:0; padding:24px; }
+  a { color:#7db4ff; }
+  .bracket { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; max-width:1100px; }
+  .col h3 { font-size:13px; opacity:.7; text-transform:uppercase; }
+  .m { background:#141a26; border:1px solid #24314d; border-radius:10px; padding:10px; margin:8px 0; font-size:13px; }
+  .m b { color:#ffd700; }
+  #caster { background:#141a26; border-left:3px solid #ffd700; padding:12px 16px; max-width:900px; white-space:pre-wrap; font-size:14px; }
+  .row { display:flex; gap:8px; margin:12px 0; align-items:center; flex-wrap:wrap; }
+  input, button { background:#24314d; color:#fff; border:1px solid #3a4c72; border-radius:6px; padding:6px 10px; }
+</style>
+</head>
+<body>
+<h1>Botcraft — torneo <span id="title"></span></h1>
+<div class="row">
+  <label>API <input id="api" value="http://localhost:8000" size="26"/></label>
+  <label>ts <input id="ts" size="12" placeholder="ultimo"/></label>
+  <button id="go">carica</button>
+  <a href="./leaderboard.html">ladder</a> <a href="./">viewer</a>
+</div>
+<h2>Campione: <span id="champ">…</span></h2>
+<div class="bracket">
+  <div class="col"><h3>Quarti</h3><div id="qf"></div></div>
+  <div class="col"><h3>Semifinali</h3><div id="sf"></div></div>
+  <div class="col"><h3>Bronzo + Finale</h3><div id="fin"></div></div>
+  <div class="col"><h3>Caster AI</h3><div id="caster">carico…</div></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const card = m => `<div class="m"><b>${m.a}</b> vs <b>${m.b}</b><br/>${m.s0}-${m.s1} seed=${m.seed}<br/><a href="./?match=${m.share?.split('match=')[1] || ''}" target="_blank">replay</a></div>`;
+async function load() {
+  const base = $('api').value.replace(/\/$/, '');
+  let ts = $('ts').value.trim();
+  if (!ts) {
+    const list = await (await fetch(`${base}/tournaments`)).json();
+    if (!list.length) { $('caster').textContent = 'nessun torneo ancora'; return; }
+    ts = list[0].ts;
+    $('ts').value = ts;
+  }
+  const rep = await (await fetch(`${base}/replays/tourney-${ts}/report.json`)).json();
+  $('title').textContent = rep.title || ts;
+  $('champ').textContent = rep.champion;
+  $('qf').innerHTML = rep.qf.map(card).join('');
+  $('sf').innerHTML = rep.sf.map(card).join('');
+  $('fin').innerHTML = card(rep.bronze) + card(rep.final);
+  try {
+    const md = await (await fetch(`${base}/replays/tourney-${ts}/commentary.md`)).text();
+    $('caster').textContent = md;
+  } catch { $('caster').textContent = '(commentary non trovato, rigenera torneo)'; }
+}
+$('go').onclick = load;
+load();
+</script>
+</body>
+</html>

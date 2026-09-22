@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Botcraft — Replay 3D S1</title>
+<style>
+  body { margin:0; font-family: system-ui, sans-serif; background:#0b0e14; color:#e6e6e6; }
+  #ui { position:fixed; left:12px; top:12px; background:#141a26ee; padding:12px; border-radius:10px; max-width:320px; }
+  #ui h1 { font-size:16px; margin:0 0 8px; }
+  #ui .row { margin:8px 0; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  button, select { background:#24314d; color:#fff; border:1px solid #3a4c72; border-radius:6px; padding:6px 10px; cursor:pointer; }
+  #tick { width:100%; }
+  #stats { font-size:12px; line-height:1.5; white-space:pre-wrap; }
+  #c { display:block; width:100vw; height:100vh; }
+  .hint { font-size:11px; opacity:.7; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <h1>Botcraft — replay 3D (S1)</h1>
+  <div class="row">
+    <input type="file" id="file" accept=".jsonl,.json"/>
+    <button id="demo">demo seed 1</button>
+    <a href="./leaderboard.html" style="color:#7db4ff;font-size:12px;">ladder</a>
+  </div>
+  <div class="row">
+    <button id="play">⏸ pausa</button>
+    <button id="cam">camera: orbita</button>
+    <select id="speed"><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option></select>
+    <span id="ticklabel">tick 0/0</span>
+  </div>
+  <div class="row"><input type="range" id="tick" min="0" max="0" value="0"/></div>
+  <div id="stats">carica un replay.jsonl…</div>
+  <div class="row"><canvas id="mini" width="128" height="128" style="border:1px solid #3a4c72;border-radius:6px;"></canvas><canvas id="graph" width="160" height="128" style="border:1px solid #3a4c72;border-radius:6px;"></canvas></div>
+  <div class="row"><button id="share">copia share link</button><button id="clip">registra clip 15s</button><button id="top">vai al top-moment</button></div>
+  <div class="hint">Servi con <code>python -m http.server</code> nella root per usare demo, oppure apri file a mano. Il viewer non calcola logica, legge solo replay.</div>
+</div>
+<script type="module" src="./viewer.js"></script>
+</body>
+</html>

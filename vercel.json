@@ -1,0 +1,1 @@
+{"functions": {"backend/api.py": {"runtime": "python3.12"}}, "rewrites": [{"source": "/api/:path*", "destination": "/backend/api.py"}, {"source": "/(.*)", "destination": "/viewer/$1"}]}

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Botcraft — Profilo agente</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#0b0e14; color:#e6e6e6; margin:0; padding:24px; }
+  a { color:#7db4ff; }
+  .badge { display:inline-block; background:#24314d; border:1px solid #3a4c72; border-radius:20px; padding:4px 12px; margin:4px; font-size:13px; }
+  .badge.gold { border-color:#ffd700; color:#ffd700; }
+  table { border-collapse:collapse; font-size:13px; }
+  th, td { border-bottom:1px solid #24314d; padding:6px 10px; text-align:left; }
+  .row { display:flex; gap:8px; margin:12px 0; align-items:center; }
+  input, button { background:#24314d; color:#fff; border:1px solid #3a4c72; border-radius:6px; padding:6px 10px; }
+  #avatar { width:64px; height:64px; border-radius:14px; }
+</style>
+</head>
+<body>
+<h1><canvas id="avatar" width="64" height="64"></canvas> <span id="name">…</span></h1>
+<div class="row">
+  <label>API <input id="api" value="http://localhost:8000" size="26"/></label>
+  <label>nome <input id="q" size="18"/></label>
+  <button id="go">carica</button>
+  <a href="./leaderboard.html">ladder</a>
+</div>
+<div id="badges"></div>
+<p id="stats"></p>
+<h3>Ultimi match</h3>
+<table id="recent"></table>
+<script>
+const $ = id => document.getElementById(id);
+// avatar deterministico da hash nome
+function avatar(name) {
+  let h = 0;
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const c = $('avatar').getContext('2d');
+  c.fillStyle = '#141a26'; c.fillRect(0, 0, 64, 64);
+  const rnd = (n => () => (n = (n * 1103515245 + 12345) >>> 0) / 2 ** 32)(h);
+  for (let i = 0; i < 40; i++) {
+    c.fillStyle = ['#4da3ff', '#ff5d5d', '#ffd700', '#3fae5a'][Math.floor(rnd() * 4)];
+    c.fillRect(Math.floor(rnd() * 16) * 4, Math.floor(rnd() * 16) * 4, 4, 4);
+  }
+}
+async function load() {
+  const base = $('api').value.replace(/\/$/, '');
+  const name = $('q').value.trim() || new URLSearchParams(location.search).get('name') || 'bot-greedy';
+  $('q').value = name;
+  const p = await (await fetch(`${base}/agents/${encodeURIComponent(name)}`)).json();
+  if (p.error || p.detail) { $('name').textContent = 'non trovato'; return; }
+  $('name').textContent = p.name;
+  avatar(p.name);
+  $('badges').innerHTML = p.badges.map(b => `<span class="badge${['gladiator', 'captain', 'mind'].includes(b) ? ' gold' : ''}">${b}</span>`).join('');
+  $('stats').textContent = `preset ${p.preset} · 1v1 Elo ${Math.round(p.elo)} (${p.games} match) · squad Elo ${Math.round(p.elo_squad)} (${p.games_squad})`;
+  $('recent').innerHTML = '<tr><th>id</th><th>match</th><th>score</th><th>replay</th></tr>' + p.recent.map(m =>
+    `<tr><td>${m.id}</td><td>${m.a} vs ${m.b}</td><td>${m.s0}-${m.s1}</td><td><a href="./?match=ladder-${m.id}" target="_blank">guarda</a></td></tr>`).join('');
+}
+$('go').onclick = load;
+load();
+</script>
+</body>
+</html>

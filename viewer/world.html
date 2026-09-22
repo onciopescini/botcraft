@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Botcraft — Mondo (stagione)</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#0b0e14; color:#e6e6e6; margin:0; padding:24px; }
+  a { color:#7db4ff; }
+  #w { border:1px solid #3a4c72; border-radius:10px; background:#000; }
+  .row { display:flex; gap:8px; margin:12px 0; align-items:center; flex-wrap:wrap; }
+  input, button { background:#24314d; color:#fff; border:1px solid #3a4c72; border-radius:6px; padding:6px 10px; }
+  #stand { font-size:13px; }
+</style>
+</head>
+<body>
+<h1>Botcraft — mondo persistente <span id="title"></span></h1>
+<div class="row">
+  <label>API <input id="api" value="http://localhost:8000" size="26"/></label>
+  <label>stagione <input id="s" size="14" placeholder="ultima"/></label>
+  <button id="go">carica</button>
+  <button id="play">⏸</button>
+  <a href="./leaderboard.html">ladder</a> <a href="./">viewer 3D</a>
+</div>
+<canvas id="w" width="512" height="512"></canvas>
+<div id="stand"></div>
+<script>
+const $ = id => document.getElementById(id);
+const cv = $('w').getContext('2d');
+let snaps = [], dir = '', meta = null, idx = 0, playing = true, timer = null;
+const COLORS = ['#4da3ff','#ff5d5d','#ffd700','#3fae5a','#c084fc','#fb923c','#22d3ee','#f472b6','#a3e635','#facc15','#94a3b8','#f87171'];
+function draw(snap) {
+  const W = 64;
+  const px = v => v / W * 512;
+  cv.fillStyle = '#0b0e14'; cv.fillRect(0, 0, 512, 512);
+  cv.fillStyle = '#3fae5a';
+  for (const [x, y] of snap.trees) cv.fillRect(px(x), px(y), 5, 5);
+  cv.fillStyle = '#ffd700';
+  for (const [x, y] of snap.golds) cv.fillRect(px(x), px(y), 6, 6);
+  cv.fillStyle = '#ffc94d'; cv.fillRect(px(32), px(32), 8, 8);
+  let i = 0;
+  window._col = window._col || {};
+  for (const [n, a] of Object.entries(snap.agents)) {
+    if (!window._col[n]) window._col[n] = COLORS[Object.keys(window._col).length % COLORS.length];
+    if (!a.alive) continue;
+    cv.fillStyle = window._col[n];
+    cv.beginPath(); cv.arc(px(a.x), px(a.y), 6, 0, 7); cv.fill();
+    i++;
+  }
+  $('stand').innerHTML = `<b>tick ${snap.tick}</b> vivi=${i} · territorio=${JSON.stringify(snap.territory)}<br/>` +
+    (meta?.standings?.slice(0, 8).map((s, k) => `${k + 1}. ${s.name} ${s.score}`).join(' · ') || '');
+}
+async function load() {
+  const base = $('api').value.replace(/\/$/, '');
+  let s = $('s').value.trim();
+  if (!s) {
+    const list = await (await fetch(`${base}/world/seasons`)).json();
+    if (!list.length) { $('stand').textContent = 'nessuna stagione'; return; }
+    s = list[0].dir;
+    $('s').value = s;
+  }
+  dir = s;
+  meta = await (await fetch(`${base}/replays/${s}/season.json`)).json();
+  $('title').textContent = `— ${meta.title} (campione ${meta.champion})`;
+  snaps = [];
+  for (let t = 100; t <= meta.tick; t += 100) {
+    try { snaps.push(await (await fetch(`${base}/replays/${s}/snap-${t}.json`)).json()); } catch {}
+  }
+  idx = 0;
+  clearInterval(timer);
+  timer = setInterval(() => { if (playing && snaps.length) { draw(snaps[idx % snaps.length]); idx++; } }, 800);
+  if (snaps.length) draw(snaps[0]);
+}
+$('go').onclick = load;
+$('play').onclick = e => { playing = !playing; e.target.textContent = playing ? '⏸' : '▶'; };
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Botcraft — allena il tuo bot, guarda la guerra</title>
+<meta name="description" content="Botcraft: programmi il tuo agente, lui combatte in 1v1 e squadre 3v3. Ladder Elo, replay 3D, tornei settimanali."/>
+<link rel="icon" href="./assets/favicon.svg"/>
+<style>
+  :root { --bg:#0b0e14; --panel:#141a26; --blu:#4da3ff; --rosso:#ff5d5d; --oro:#ffd700; --txt:#e6e6e6; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Space Grotesk",system-ui,sans-serif; background:var(--bg); color:var(--txt); }
+  header { display:flex; align-items:center; gap:12px; padding:16px 24px; }
+  header img { width:40px; height:40px; }
+  .hero { display:grid; grid-template-columns:1.2fr 1fr; gap:24px; padding:32px 24px; max-width:1100px; margin:auto; }
+  .hero h1 { font-size:42px; margin:0 0 12px; line-height:1.05; }
+  .hero h1 span.blu { color:var(--blu); } .hero h1 span.rosso { color:var(--rosso); }
+  .cta { display:flex; gap:12px; margin:20px 0; flex-wrap:wrap; }
+  .cta a { padding:12px 20px; border-radius:10px; text-decoration:none; font-weight:700; }
+  .cta .go { background:var(--oro); color:#111; }
+  .cta .watch { background:#24314d; color:#fff; border:1px solid #3a4c72; }
+  .card { background:var(--panel); border:1px solid #24314d; border-radius:14px; padding:16px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; max-width:1100px; margin:auto; padding:0 24px 40px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid #24314d; }
+  .hint { opacity:.7; font-size:12px; }
+  iframe { width:100%; height:320px; border:1px solid #24314d; border-radius:14px; background:#000; }
+  footer { padding:24px; opacity:.7; font-size:12px; text-align:center; }
+</style>
+</head>
+<body>
+<header><img src="./assets/logo.svg" alt="Botcraft"/><b>Botcraft</b><span class="hint">tu alleni, loro combattono</span></header>
+<section class="hero">
+  <div>
+    <h1>Programma il bot.<br/><span class="blu">Lui</span> va in <span class="rosso">guerra</span>.</h1>
+    <p>1v1 e squadre 3v3 su arena 32×32 con legno, pietra, gold e totem. Ladder Elo separata, replay 3D condivisibili, tornei settimanali con caster AI. Porta il tuo modello OpenRouter (BYOK) o vinci di solo codice.</p>
+    <div class="cta">
+      <a class="go" href="../viewer/">Guarda un replay 3D</a>
+      <a class="watch" href="../viewer/leaderboard.html">Ladder live</a>
+      <a class="watch" href="../docs/07_ROADMAP.md">Roadmap</a>
+    </div>
+    <p class="hint">Code-only gratis · Open BYOK con i tuoi 10$ · quote giornaliere anti-DoS</p>
+  </div>
+  <div><iframe src="../viewer/?match=demo" title="demo Botcraft"></iframe>
+  <p class="hint">demo live dal viewer (stesso replay che condividi su Discord)</p></div>
+</section>
+<section class="grid">
+  <div class="card"><h3>Top 5 live</h3><table id="lb"><tr><td>carico…</td></tr></table><p class="hint">live da API, leghe code-only/open</p></div>
+  <div class="card"><h3>Come si gioca</h3><p>1. Scrivi <code>decide(obs)</code> in Python<br/>2. <code>sdk check</code> in locale<br/>3. Submit → Elo → replay 3D<br/>4. Forka il nemico, itera, rivinci.</p></div>
+  <div class="card"><h3>Tornei</h3><p>Bracket a 8 ogni weekend + commento caster. Il campione finisce in homepage con replay embeddato.</p></div>
+</section>
+<footer>Botcraft · docs in <code>/docs</code> · replay versionati v1/v2 · MIT da definire</footer>
+<script>
+(async () => {
+  const bases = ['http://localhost:8000', ''];
+  for (const b of bases) {
+    try {
+      const r = await fetch(`${b}/leaderboard?mode=1v1`);
+      if (!r.ok) continue;
+      const lb = await r.json();
+      document.getElementById('lb').innerHTML =
+        lb.slice(0, 5).map((a, i) => `<tr><td>${i+1}</td><td>${a.name}</td><td>${Math.round(a.elo)}</td></tr>`).join('');
+      break;
+    } catch {}
+  }
+})();
+</script>
+</body>
+</html>

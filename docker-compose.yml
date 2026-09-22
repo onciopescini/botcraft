@@ -1,0 +1,20 @@
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+    volumes:
+      - ./matches:/app/matches
+      - ./backend:/app/backend
+  worker:
+    build: .
+    # sandbox vera: niente rete, 1 CPU, 256MB, 64 processi
+    network_mode: none
+    cpus: 1.0
+    mem_limit: 256m
+    pids_limit: 64
+    command: ["python", "backend/worker.py"]
+    volumes:
+      - ./matches:/app/matches
+      - ./backend:/app/backend

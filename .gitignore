@@ -1,0 +1,11 @@
+# chiavi MAI nel repo
+backend/.openrouter_key
+backend/.typesafe_key
+backend/.vercel_key
+backend/*.db
+backend/uploads/
+backend/memory/
+matches/
+botcraft-itch.zip
+__pycache__/
+*.pyc
