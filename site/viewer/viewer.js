@@ -129,8 +129,31 @@ function tickParts(dt) {
   }
 }
 let slowmoUntil = 0;
+let shakeUntil = 0; // screen-shake sui KO
 let prevSnap = null;
 let topTick = 0; // top-moment auto: primo KO o danno max
+// hp mostrati (animati verso il target invece di snap)
+const dispHp = new Map();
+// audio WebAudio, muto default
+let AC = null, audioOn = false;
+function blip(freq, dur = 0.06, vol = 0.08) {
+  if (!audioOn) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.frequency.value = freq; o.type = 'sine';
+    g.gain.setValueAtTime(vol, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
+    o.connect(g).connect(AC.destination);
+    o.start(); o.stop(AC.currentTime + dur);
+  } catch {}
+}
+function smoothHp(mesh, key, target) {
+  const cur = dispHp.has(key) ? dispHp.get(key) : target;
+  const nx = cur + (target - cur) * 0.2;
+  dispHp.set(key, nx);
+  mesh.scale.y = 0.4 + 0.6 * (Math.max(0, nx) / 100);
+}
 
 let frames = [];
 let playing = true;
@@ -171,9 +194,9 @@ function drawFrame(a, b, alpha) {
   const [x2, z2] = xz(lerp(a.p2.x, b.p2.x), lerp(a.p2.y, b.p2.y));
   agent1.position.x = x1; agent1.position.z = z1;
   agent2.position.x = x2; agent2.position.z = z2;
-  // altezza = hp (feedback visivo), spada = emissive, flash bianco sul danno
-  agent1.scale.y = 0.4 + 0.6 * (a.p1.hp / 100);
-  agent2.scale.y = 0.4 + 0.6 * (a.p2.hp / 100);
+  // altezza = hp animati (feedback visivo), spada = emissive, flash bianco sul danno
+  smoothHp(agent1, 'a1', a.p1.hp);
+  smoothHp(agent2, 'a2', a.p2.hp);
   if (prevHp && a.p1.hp < prevHp[0]) flashT.a1 = performance.now();
   if (prevHp && a.p2.hp < prevHp[1]) flashT.a2 = performance.now();
   prevHp = [a.p1.hp, a.p2.hp];
@@ -185,16 +208,19 @@ function drawFrame(a, b, alpha) {
     const res = (P, Q) => [Q.wood - P.wood, Q.stone - P.stone, (Q.gold || 0) - (P.gold || 0)];
     const [dw1, ds1, dg1] = res(prevSnap.p1, a.p1);
     const [dw2, ds2, dg2] = res(prevSnap.p2, a.p2);
-    if (dw1 > 0) burst(agent1.position.x, agent1.position.z, 0x3fae5a, 8);
-    if (ds1 > 0) burst(agent1.position.x, agent1.position.z, 0x9aa3b2, 8);
-    if (dg1 > 0) burst(agent1.position.x, agent1.position.z, 0xffd700, 12);
-    if (dw2 > 0) burst(agent2.position.x, agent2.position.z, 0x3fae5a, 8);
-    if (ds2 > 0) burst(agent2.position.x, agent2.position.z, 0x9aa3b2, 8);
-    if (dg2 > 0) burst(agent2.position.x, agent2.position.z, 0xffd700, 12);
+    if (dw1 > 0) { burst(agent1.position.x, agent1.position.z, 0x3fae5a, 8); blip(660); }
+    if (ds1 > 0) { burst(agent1.position.x, agent1.position.z, 0x9aa3b2, 8); blip(520); }
+    if (dg1 > 0) { burst(agent1.position.x, agent1.position.z, 0xffd700, 12); blip(880); }
+    if (dw2 > 0) { burst(agent2.position.x, agent2.position.z, 0x3fae5a, 8); blip(660); }
+    if (ds2 > 0) { burst(agent2.position.x, agent2.position.z, 0x9aa3b2, 8); blip(520); }
+    if (dg2 > 0) { burst(agent2.position.x, agent2.position.z, 0xffd700, 12); blip(880); }
     for (const [P, Q, mesh] of [[prevSnap.p1, a.p1, agent1], [prevSnap.p2, a.p2, agent2]]) {
+      if (P.hp > Q.hp) blip(180, 0.09);
       if (P.hp > 0 && Q.hp <= 0) {
         burst(mesh.position.x, mesh.position.z, 0xff7a00, 40, 5);
+        blip(90, 0.25, 0.12);
         slowmoUntil = performance.now() + 2000;
+        shakeUntil = performance.now() + 450;
       }
     }
   }
@@ -213,6 +239,8 @@ function drawFrame(a, b, alpha) {
     put(agent1c, a.t1[2], (bSquad ? b : a).t1[2]);
     put(agent2b, a.t2[1], (bSquad ? b : a).t2[1]);
     put(agent2c, a.t2[2], (bSquad ? b : a).t2[2]);
+    smoothHp(agent1b, 'a1b', a.t1[1].hp); smoothHp(agent1c, 'a1c', a.t1[2].hp);
+    smoothHp(agent2b, 'a2b', a.t2[1].hp); smoothHp(agent2c, 'a2c', a.t2[2].hp);
   }
 
   // risorse del frame A (se replay vecchio senza trees, mostra solo agenti)
@@ -328,6 +356,12 @@ function loop(now) {
       camera.position.set(16, 34, 26);
       camera.lookAt(16, 0, 16);
     }
+    const nowS = performance.now();
+    if (nowS < shakeUntil) {
+      const k = (shakeUntil - nowS) / 450; // decade
+      camera.position.x += (Math.random() - 0.5) * 2.4 * k;
+      camera.position.y += (Math.random() - 0.5) * 1.6 * k;
+    }
   }
   tickParts(dt);
   totemMat.emissiveIntensity = 0.8 + 0.4 * Math.sin(now / 500); // glow pulsante
@@ -362,6 +396,10 @@ document.getElementById('top').addEventListener('click', () => {
     tFloat = Math.max(0, topTick - 4); // 2s prima del momento per contesto
     elTick.value = Math.floor(tFloat);
   }
+});
+document.getElementById('audio').addEventListener('click', (e) => {
+  audioOn = !audioOn;
+  e.target.textContent = audioOn ? 'audio: on' : 'audio: off';
 });
 document.getElementById('cam').addEventListener('click', (e) => {  camMode = camMode === 'orbit' ? 'follow' : 'orbit';
   e.target.textContent = camMode === 'orbit' ? 'camera: orbita' : 'camera: follow';
