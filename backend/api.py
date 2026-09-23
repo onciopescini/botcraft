@@ -220,14 +220,17 @@ def list_tourneys():
 
 @app.get("/agents/{name}")
 def agent_profile(name: str):
-    from backend.store import get_agent, recent_matches, get_progress, owned_packs
+    from backend.store import get_agent, recent_matches, get_progress, owned_packs, prestige_of
     ag = get_agent(name)
     if not ag:
         raise HTTPException(404, "agente inesistente")
     recent = recent_matches(name)
+    prest = prestige_of(name)
     elo = ag.get("elo", 1200)
     games = ag.get("games", 0)
     badges = []
+    for p in prest:
+        badges.append(f"prestige-{p['rank']}@{p['season']}")
     if games < 5:
         badges.append("rookie")
     if games >= 20:
@@ -431,3 +434,36 @@ def buy_prompt(inp: BuyIn, req: Request):
     p = ROOT / "prompts" / f"{inp.pack}.md"
     return {"status": st, "pack": inp.pack,
             "content": p.read_text() if p.exists() else ""}
+
+
+def _require_admin(req: Request):
+    admin = os.environ.get("ADMIN_TOKEN", "").strip()
+    if admin:
+        tok = req.headers.get("authorization", "").removeprefix("Bearer ").strip()
+        if tok != admin:
+            raise HTTPException(403, "serve token admin")
+        return tok
+    return require_token(req)
+
+
+class RolloverIn(BaseModel):
+    season: str
+
+
+@app.post("/admin/rollover")
+def post_rollover(inp: RolloverIn, req: Request):
+    from backend.store import season_rollover
+    _require_admin(req)
+    champs = season_rollover(inp.season[:20])
+    return {"season": inp.season[:20], "champions": champs,
+            "note": "Elo/XP/boost resettati, prestige assegnati"}
+
+
+@app.delete("/agents/{name}")
+def delete_agent_ep(name: str, req: Request):
+    from backend.store import delete_agent, get_agent
+    require_token(req)
+    if not get_agent(name):
+        raise HTTPException(404, "agente inesistente")
+    delete_agent(name)
+    return {"deleted": name}

@@ -64,6 +64,10 @@ def init():
       name TEXT NOT NULL, pack TEXT NOT NULL,
       PRIMARY KEY (name, pack)
     );
+    CREATE TABLE IF NOT EXISTS prestige(
+      name TEXT NOT NULL, season TEXT NOT NULL, rank INTEGER NOT NULL,
+      PRIMARY KEY (name, season)
+    );
     """)
     con.commit()
     for ddl in ("ALTER TABLE agents ADD COLUMN elo_squad REAL NOT NULL DEFAULT 1200",
@@ -449,3 +453,45 @@ def token_owner(token: str):
     row = con.execute("SELECT discord_id,username FROM tokens WHERE token=?", (token,)).fetchone()
     con.close()
     return dict(row) if row else None
+
+
+def season_rollover(season: str):
+    """Reset Elo/XP/boost, albo d'oro top-3, badge prestige permanenti."""
+    con = connect()
+    top = con.execute("SELECT name,elo FROM agents ORDER BY elo DESC LIMIT 3").fetchall()
+    for rank, r in enumerate(top, 1):
+        con.execute("INSERT OR IGNORE INTO prestige(name,season,rank) VALUES(?,?,?)",
+                    (r["name"], season, rank))
+    con.execute("UPDATE agents SET elo=1200,games=0,elo_squad=1200,games_squad=0,"
+                "elo_blitz=1200,games_blitz=0,rd=350,rd_squad=350,rd_blitz=350,"
+                "coins=100,last_game=0")
+    con.execute("DELETE FROM xp")
+    con.commit()
+    champs = [dict(r) for r in top]
+    con.close()
+    return champs
+
+
+def prestige_of(name: str):
+    con = connect()
+    rows = con.execute("SELECT season,rank FROM prestige WHERE name=? ORDER BY season", (name,)).fetchall()
+    con.close()
+    return [dict(r) for r in rows]
+
+
+def delete_agent(name: str):
+    """Cancellazione GDPR: nome, Elo, memoria file, zip. Replay restano anonimizzati."""
+    import shutil
+    con = connect()
+    for t in ("agents", "xp", "owned", "prestige"):
+        con.execute(f"DELETE FROM {t} WHERE name=?", (name,))
+    con.execute("UPDATE matches SET a='[deleted]' WHERE a=?", (name,))
+    con.execute("UPDATE matches SET b='[deleted]' WHERE b=?", (name,))
+    con.commit()
+    con.close()
+    memdir = pathlib.Path(__file__).resolve().parents[1] / "backend" / "memory"
+    try:
+        (memdir / f"{name}.json").unlink(missing_ok=True)
+    except Exception:
+        pass
+    return True
