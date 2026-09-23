@@ -23,6 +23,7 @@ def run_season(decides: dict[str, object], seed: int, title: str = "season",
     if snap_dir:
         snap_dir.mkdir(parents=True, exist_ok=True)
     delta = []
+    full = []  # replay v3 completo per il viewer mondo
     prev = {n: {"x": a["x"], "y": a["y"], "hp": a["hp"], "alive": a["alive"]} for n, a in st["agents"].items()}
     with cf.ThreadPoolExecutor(max_workers=min(8, len(names))) as ex:
         while not st["over"] and st["tick"] < max_ticks:
@@ -39,6 +40,10 @@ def run_season(decides: dict[str, object], seed: int, title: str = "season",
                     new_mems[n] = a["memory"]
                 acts[n] = a
             step_world(st, acts)
+            # replay pieno v3 (posizioni/hp vivi ogni tick, ~200B) + delta leggera
+            full.append({"tick": st["tick"], "w": st["w"], "h": st["h"],
+                         "a": {n: [a["x"], a["y"], a["hp"], 1 if a["alive"] else 0]
+                               for n, a in st["agents"].items()}})
             # delta: solo agenti cambiati
             moved, dead, resp = {}, [], []
             for n, a in st["agents"].items():
@@ -80,6 +85,7 @@ def run_season(decides: dict[str, object], seed: int, title: str = "season",
               "champion": standings[0][0], "territory": territory(st)}
     if snap_dir:
         (snap_dir / "delta.jsonl").write_text("\n".join(json.dumps(d) for d in delta) + "\n")
+        (snap_dir / "replay.jsonl").write_text("\n".join(json.dumps({"v": 3, **r}) for r in full) + "\n")
         (snap_dir / "season.json").write_text(json.dumps(report, indent=2))
     for n in names:
         save_memory(n, new_mems[n])

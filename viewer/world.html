@@ -4,75 +4,191 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Botcraft — Mondo (stagione)</title>
+<link rel="stylesheet" href="../design.css"/>
 <style>
-  body { font-family: system-ui, sans-serif; background:#0b0e14; color:#e6e6e6; margin:0; padding:24px; }
-  a { color:#7db4ff; }
-  #w { border:1px solid #3a4c72; border-radius:10px; background:#000; }
-  .row { display:flex; gap:8px; margin:12px 0; align-items:center; flex-wrap:wrap; }
-  input, button { background:#24314d; color:#fff; border:1px solid #3a4c72; border-radius:6px; padding:6px 10px; }
+  .layout { display:grid; grid-template-columns:1fr 300px; gap:16px; max-width:1120px; margin:auto; padding:16px 24px 48px; }
+  #w { border:1px solid var(--line); border-radius:14px; background:#000; width:100%; touch-action:none; cursor:grab; }
+  .row { display:flex; gap:8px; margin:10px 0; align-items:center; flex-wrap:wrap; }
+  #tick { flex:1; accent-color:var(--oro); }
+  #ticklabel { font-size:12px; font-variant-numeric:tabular-nums; }
+  #feed { font-size:12px; line-height:1.6; max-height:180px; overflow-y:auto; }
   #stand { font-size:13px; }
+  #stand .me { color:var(--oro); }
+  .trails { font-size:12px; color:var(--mut); }
+  @media (max-width:860px) { .layout { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
-<h1>Botcraft — mondo persistente <span id="title"></span></h1>
-<div class="row">
-  <label>API <input id="api" value="https://botcraft-6tjh.onrender.com" size="26"/></label>
-  <label>stagione <input id="s" size="14" placeholder="ultima"/></label>
-  <button id="go">carica</button>
-  <button id="play">⏸</button>
-  <a href="./leaderboard.html">ladder</a> <a href="./">viewer 3D</a>
+<nav class="topnav">
+  <img src="../assets/logo.svg" alt=""/><b>Botcraft · mondo</b><span style="flex:1"></span>
+  <a href="../">home</a><a href="./leaderboard.html">ladder</a><a href="./">viewer 3D</a>
+</nav>
+<div class="layout">
+  <div>
+    <div class="row">
+      <label>stagione <input id="s" size="14" placeholder="ultima"/></label>
+      <button id="go">carica</button>
+      <button id="play">pausa</button>
+      <select id="speed"><option value="1">1x</option><option value="4" selected>4x</option><option value="12">12x</option></select>
+      <span id="ticklabel">tick 0/0</span>
+    </div>
+    <canvas id="w" width="640" height="640"></canvas>
+    <div class="row"><input type="range" id="tick" min="0" max="0" value="0" style="flex:1"/></div>
+    <p class="trails hint">trascina per muovere la camera · rotella/pinch per zoom · file replay.jsonl (v3) o stagione dal server</p>
+    <div class="row"><input type="file" id="file" accept=".jsonl,.json"/></div>
+  </div>
+  <div>
+    <div class="card"><h3 style="margin-top:0">Classifica live</h3><div id="stand">carico…</div></div>
+    <div class="card" style="margin-top:12px;"><h3 style="margin-top:0">Eventi</h3><div id="feed">nessun evento…</div></div>
+  </div>
 </div>
-<canvas id="w" width="512" height="512"></canvas>
-<div id="stand"></div>
 <script>
 const $ = id => document.getElementById(id);
-const cv = $('w').getContext('2d');
-let snaps = [], dir = '', meta = null, idx = 0, playing = true, timer = null;
-const COLORS = ['#4da3ff','#ff5d5d','#ffd700','#3fae5a','#c084fc','#fb923c','#22d3ee','#f472b6','#a3e635','#facc15','#94a3b8','#f87171'];
-function draw(snap) {
-  const W = 64;
-  const px = v => v / W * 512;
-  cv.fillStyle = '#0b0e14'; cv.fillRect(0, 0, 512, 512);
-  cv.fillStyle = '#3fae5a';
-  for (const [x, y] of snap.trees) cv.fillRect(px(x), px(y), 5, 5);
-  cv.fillStyle = '#ffd700';
-  for (const [x, y] of snap.golds) cv.fillRect(px(x), px(y), 6, 6);
-  cv.fillStyle = '#ffc94d'; cv.fillRect(px(32), px(32), 8, 8);
-  let i = 0;
-  window._col = window._col || {};
-  for (const [n, a] of Object.entries(snap.agents)) {
-    if (!window._col[n]) window._col[n] = COLORS[Object.keys(window._col).length % COLORS.length];
-    if (!a.alive) continue;
-    cv.fillStyle = window._col[n];
-    cv.beginPath(); cv.arc(px(a.x), px(a.y), 6, 0, 7); cv.fill();
-    i++;
-  }
-  $('stand').innerHTML = `<b>tick ${snap.tick}</b> vivi=${i} · territorio=${JSON.stringify(snap.territory)}<br/>` +
-    (meta?.standings?.slice(0, 8).map((s, k) => `${k + 1}. ${s.name} ${s.score}`).join(' · ') || '');
+const cv = $('w'), g = cv.getContext('2d');
+const COLORS = ['#4da3ff','#ff5d5d','#ffd700','#3fae5a','#c084fc','#fb923c','#22d3ee','#f472b6','#a3e635','#facc15','#94a3b8','#f87171','#f472b6','#67e8f9','#fda4af','#6ee7b7'];
+let frames = [], names = [], meta = null, t = 0, playing = true, speed = 4;
+let cam = { x: 32, y: 32, z: 10 }; // centro + zoom (celle visibili ~ z*2)
+let trails = {};
+const col = {};
+function colorOf(n) {
+  if (!col[n]) col[n] = COLORS[Object.keys(col).length % COLORS.length];
+  return col[n];
 }
+function feed(html) {
+  const el = $('feed');
+  if (el.textContent.startsWith('nessun evento')) el.textContent = '';
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  el.prepend(d);
+  while (el.children.length > 14) el.lastChild.remove();
+}
+function parseReplay(text, label) {
+  frames = text.trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
+  names = Object.keys(frames[0].a);
+  trails = {};
+  t = 0;
+  $('tick').max = frames.length - 1;
+  $('feed').textContent = 'nessun evento…';
+  let lastAlive = {};
+  frames.forEach((f, i) => {
+    for (const [n, a] of Object.entries(f.a)) {
+      const was = lastAlive[n];
+      if (was === undefined) { lastAlive[n] = !!a[3]; continue; }
+      if (was && !a[3]) feed(`tick ${f.tick}: <b style="color:#ff5d5d">KO</b> ${n}`);
+      if (!was && a[3]) feed(`tick ${f.tick}: ${n} rientra`);
+      lastAlive[n] = !!a[3];
+    }
+  });
+}
+function draw() {
+  const f = frames[Math.floor(t)];
+  if (!f) return;
+  const W = f.w || 64, H = f.h || 64;
+  const S = cv.width / (cam.z * 2); // px per cella
+  const ox = cv.width / 2 - cam.x * S, oy = cv.height / 2 - cam.y * S;
+  const X = x => ox + x * S, Y = y => oy + y * S;
+  g.fillStyle = '#0b0e14'; g.fillRect(0, 0, cv.width, cv.height);
+  // quadranti territorio
+  g.fillStyle = '#101623';
+  g.fillRect(X(0), Y(0), W / 2 * S, H / 2 * S);
+  g.fillRect(X(W / 2), Y(H / 2), W / 2 * S, H / 2 * S);
+  g.strokeStyle = '#24314d';
+  g.strokeRect(X(0), Y(0), W * S, H * S);
+  g.beginPath(); g.moveTo(X(W / 2), Y(0)); g.lineTo(X(W / 2), Y(H)); g.moveTo(X(0), Y(H / 2)); g.lineTo(X(W), Y(H / 2)); g.stroke();
+  // totem
+  g.fillStyle = '#ffd700';
+  g.beginPath(); g.arc(X(32), Y(32), Math.max(3, 0.5 * S), 0, 7); g.fill();
+  // scie + agenti
+  for (const n of names) {
+    const a = f.a[n];
+    if (!a[3]) continue;
+    trails[n] = trails[n] || [];
+    trails[n].push([a[0], a[1]]);
+    if (trails[n].length > 40) trails[n].shift();
+    g.strokeStyle = colorOf(n) + '55';
+    g.beginPath();
+    trails[n].forEach(([x, y], i) => i ? g.lineTo(X(x + .5), Y(y + .5)) : g.moveTo(X(x + .5), Y(y + .5)));
+    g.stroke();
+  }
+  for (const n of names) {
+    const a = f.a[n];
+    if (!a[3]) continue;
+    g.fillStyle = colorOf(n);
+    g.beginPath(); g.arc(X(a[0] + .5), Y(a[1] + .5), Math.max(3, 0.35 * S), 0, 7); g.fill();
+    // anello hp
+    g.strokeStyle = a[2] > 50 ? '#3fae5a' : '#ff5d5d';
+    g.beginPath(); g.arc(X(a[0] + .5), Y(a[1] + .5), Math.max(5, 0.55 * S), -1.5, -1.5 + 6.28 * a[2] / 100); g.stroke();
+  }
+  // etichette top-3 per hp
+  g.font = '11px system-ui'; g.textAlign = 'center';
+  const alive = names.filter(n => f.a[n][3]).sort((p, q) => f.a[q][2] - f.a[p][2]).slice(0, 3);
+  for (const n of alive) {
+    const a = f.a[n];
+    g.fillStyle = colorOf(n);
+    g.fillText(n.slice(0, 12), X(a[0] + .5), Y(a[1] + .5) - 8);
+  }
+  $('ticklabel').textContent = `tick ${f.tick} · vivi ${alive.length}/${names.length}`;
+}
+function renderStand() {
+  if (!frames.length) return;
+  const f = frames[Math.floor(t)];
+  const rows = names.map(n => [n, f.a[n][2], f.a[n][3]]).sort((a, b) => b[1] - a[1]);
+  let html = meta?.standings ? '<b>stagione (punti)</b><br/>' +
+    meta.standings.slice(0, 8).map((s, i) => `${i + 1}. ${s.name} ${s.score}`).join('<br/>') + '<br/><br/><b>ora (hp)</b><br/>' : '';
+  $('stand').innerHTML = html + rows.map(([n, hp, al]) =>
+    `<span style="color:${colorOf(n)}">●</span> ${n} ${al ? hp + 'hp' : '<i>morto</i>'}`).join('<br/>');
+}
+let last = performance.now();
+(function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = (now - last) / 1000;
+  last = now;
+  if (frames.length && playing) {
+    t += dt * 2 * speed;
+    if (t >= frames.length - 1) t = 0;
+    $('tick').value = Math.floor(t);
+  }
+  if (frames.length) { draw(); renderStand(); }
+})(performance.now());
+$('tick').addEventListener('input', () => { t = +$('tick').value; trails = {}; });
+$('play').onclick = e => { playing = !playing; e.target.textContent = playing ? 'pausa' : 'play'; };
+$('speed').onchange = e => speed = +e.target.value;
+// pan + zoom
+{
+  let drag = null;
+  cv.addEventListener('pointerdown', e => { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const S = cv.width / (cam.z * 2);
+    cam.x -= (e.clientX - drag[0]) / S; cam.y -= (e.clientY - drag[1]) / S;
+    drag = [e.clientX, e.clientY];
+  });
+  const end = () => drag = null;
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  cv.addEventListener('wheel', e => { e.preventDefault(); cam.z = Math.min(64, Math.max(6, cam.z * (1 + Math.sign(e.deltaY) * 0.12))); }, { passive: false });
+}
+$('file').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (f) { parseReplay(await f.text()); trails = {}; }
+});
 async function load() {
-  const base = $('api').value.replace(/\/$/, '');
-  let s = $('s').value.trim();
+  const base = 'https://botcraft-6tjh.onrender.com';
+  let s = new URLSearchParams(location.search).get('s') || $('s').value.trim();
   if (!s) {
-    const list = await (await fetch(`${base}/world/seasons`)).json();
-    if (!list.length) { $('stand').textContent = 'nessuna stagione'; return; }
-    s = list[0].dir;
-    $('s').value = s;
+    try {
+      const list = await (await fetch(`${base}/world/seasons`)).json();
+      if (!list.length) { $('stand').textContent = 'nessuna stagione'; return; }
+      s = list[0].dir;
+      $('s').value = s;
+    } catch { $('stand').textContent = 'API offline'; return; }
   }
-  dir = s;
-  meta = await (await fetch(`${base}/replays/${s}/season.json`)).json();
-  $('title').textContent = `— ${meta.title} (campione ${meta.champion})`;
-  snaps = [];
-  for (let t = 100; t <= meta.tick; t += 100) {
-    try { snaps.push(await (await fetch(`${base}/replays/${s}/snap-${t}.json`)).json()); } catch {}
-  }
-  idx = 0;
-  clearInterval(timer);
-  timer = setInterval(() => { if (playing && snaps.length) { draw(snaps[idx % snaps.length]); idx++; } }, 800);
-  if (snaps.length) draw(snaps[0]);
+  try {
+    meta = await (await fetch(`${base}/replays/${s}/season.json`)).json();
+    const txt = await (await fetch(`${base}/replays/${s}/replay.jsonl`)).text();
+    parseReplay(txt); trails = {};
+  } catch { $('stand').textContent = 'replay non trovato'; }
 }
 $('go').onclick = load;
-$('play').onclick = e => { playing = !playing; e.target.textContent = playing ? '⏸' : '▶'; };
 load();
 </script>
 </body>
