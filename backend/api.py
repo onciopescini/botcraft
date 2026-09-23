@@ -212,7 +212,7 @@ def list_tourneys():
 
 @app.get("/agents/{name}")
 def agent_profile(name: str):
-    from backend.store import get_agent, recent_matches
+    from backend.store import get_agent, recent_matches, get_progress
     ag = get_agent(name)
     if not ag:
         raise HTTPException(404, "agente inesistente")
@@ -240,6 +240,8 @@ def agent_profile(name: str):
         badges.append("wild")
     return {**{k: ag[k] for k in ("name", "preset", "elo", "games") if k in ag},
             "elo_squad": ag.get("elo_squad", 1200), "games_squad": ag.get("games_squad", 0),
+            "elo_blitz": ag.get("elo_blitz", 1200), "games_blitz": ag.get("games_blitz", 0),
+            "coins": ag.get("coins", 100), "progress": get_progress(name),
             "badges": badges, "recent": recent,
             "share": f"/viewer/profile.html?name={name}"}
 

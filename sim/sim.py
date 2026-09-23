@@ -75,7 +75,7 @@ def new_match(seed: int, max_ticks: int = MAX_TICKS) -> dict:
         "golds": golds,
         "pending_respawns": [],  # [due_tick, type]
         "messages": ["", ""],
-        "coach": [None, None],  # per lato: {"tick":t,"x":x,"y":y} ping del coach
+        "coach": [[], []],  # per lato: [{"tick":t,"x":x,"y":y}] (cap 3, da livelli)
         "walls": {},  # "x,y" -> expiry_tick
         "events": [[], []],
         "over": False,
@@ -84,11 +84,19 @@ def new_match(seed: int, max_ticks: int = MAX_TICKS) -> dict:
 
 
 def set_coach(state: dict, pid: int, tick: int, x: int, y: int):
-    """1 ping del coach per match: da tick in poi il bot vede obs["coach"]."""
+    """Ping del coach: da tick in poi il bot vede obs["coach"] (ultimo scaduto). Cap 3."""
+    if len(state["coach"][pid]) >= 3:
+        return
     tick = max(0, min(state["max_ticks"], int(tick)))
     x = max(0, min(W - 1, int(x)))
     y = max(0, min(H - 1, int(y)))
-    state["coach"][pid] = {"tick": tick, "x": x, "y": y}
+    state["coach"][pid].append({"tick": tick, "x": x, "y": y})
+    state["coach"][pid].sort(key=lambda c: c["tick"])
+
+
+def coach_now(state: dict, pid: int):
+    due = [c for c in state["coach"][pid] if state["tick"] >= c["tick"]]
+    return due[-1] if due else None
 
 
 def gas_radius(state: dict) -> float:
@@ -381,7 +389,7 @@ def to_obs(state: dict, pid: int) -> dict:
                   "hp": foe["hp"] if visible else -1},
         "enemy_message": state.get("messages", ["", ""])[1 - pid] if visible else "",
         "my_last_message": state.get("messages", ["", ""])[pid],
-        "coach": state.get("coach", [None, None])[pid] if state["tick"] >= (state.get("coach", [None, None])[pid] or {}).get("tick", 10 ** 9) else None,
+        "coach": coach_now(state, pid),
         "gas_radius": round(gas_radius(state), 1),
         "nearby": nearby,
         "events": list(state["events"][pid][-5:]),

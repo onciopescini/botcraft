@@ -7,30 +7,40 @@ import pathlib
 import concurrent.futures as cf
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from sim.sim import new_match, step, to_obs, result, state_hash, VALID_ACTIONS, clean_message, set_coach, gas_radius
+from sim.sim import new_match, step, to_obs, result, state_hash, VALID_ACTIONS, clean_message, set_coach, gas_radius, coach_now
 
 TIMEOUT_S = 0.6
 MEM_DIR = pathlib.Path(__file__).resolve().parents[1] / "backend" / "memory"
 MEM_LIMIT = 10 * 1024
 
 
-def load_memory(name: str) -> dict:
+def load_memory(name: str, limit_kb: int = 10) -> dict:
     p = MEM_DIR / f"{name}.json"
     if not p.exists():
         return {}
     try:
-        data = json.loads(p.read_text()[:MEM_LIMIT])
+        data = json.loads(p.read_text()[:limit_kb * 1024])
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
 
 
-def save_memory(name: str, mem: dict):
+def save_memory(name: str, mem: dict, limit_kb: int = 10):
     if not isinstance(mem, dict):
         return
     MEM_DIR.mkdir(parents=True, exist_ok=True)
-    raw = json.dumps(mem)[:MEM_LIMIT]
+    raw = json.dumps(mem)[:limit_kb * 1024]
     (MEM_DIR / f"{name}.json").write_text(raw)
+
+
+def _bonus(name: str) -> tuple[int, int]:
+    try:
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+        from backend.store import get_progress
+        pr = get_progress(name)
+        return pr["mem_kb"], pr["pings"]
+    except Exception:
+        return 10, 1
 
 
 def safe_decide(fn, obs):
@@ -56,13 +66,16 @@ def safe_decide(fn, obs):
 
 def run_match(decide_a, decide_b, seed: int, out_path: str | None = None,
               name_a: str = "p1", name_b: str = "p2", max_ticks: int = 300,
-              coach_a: dict | None = None, coach_b: dict | None = None):
+              coach_a: dict | list | None = None, coach_b: dict | list | None = None):
     state = new_match(seed, max_ticks)
-    if coach_a:
-        set_coach(state, 0, coach_a.get("tick", 0), coach_a.get("x", 16), coach_a.get("y", 16))
-    if coach_b:
-        set_coach(state, 1, coach_b.get("tick", 0), coach_b.get("x", 16), coach_b.get("y", 16))
-    mem_a, mem_b = load_memory(name_a), load_memory(name_b)
+    mem_a_kb, ping_a = _bonus(name_a)
+    mem_b_kb, ping_b = _bonus(name_b)
+    for pid, cl in ((0, coach_a), (1, coach_b)):
+        lst = cl if isinstance(cl, list) else ([cl] if cl else [])
+        for c in lst[: (ping_a if pid == 0 else ping_b)]:
+            if isinstance(c, dict):
+                set_coach(state, pid, c.get("tick", 0), c.get("x", 16), c.get("y", 16))
+    mem_a, mem_b = load_memory(name_a, mem_a_kb), load_memory(name_b, mem_b_kb)
     new_mem_a, new_mem_b = mem_a, mem_b
     replay = []
     with cf.ThreadPoolExecutor(max_workers=2) as _:
@@ -98,7 +111,7 @@ def run_match(decide_a, decide_b, seed: int, out_path: str | None = None,
                    "sword": state["agents"][1]["has_sword"]},
             "a1": a1["action"], "a2": a2["action"],
             "m1": state["messages"][0], "m2": state["messages"][1],
-            "c1": state["coach"][0], "c2": state["coach"][1],
+            "c1": coach_now(state, 0), "c2": coach_now(state, 1),
             "s1": s1, "s2": s2,
             "gas": round(gas_radius(state), 1),
             "trees": [list(p) for p in state["trees"]],
@@ -113,8 +126,8 @@ def run_match(decide_a, decide_b, seed: int, out_path: str | None = None,
     res["hash"] = state_hash(state)
     res["seed"] = seed
     if state["over"] or state["tick"] >= state["max_ticks"]:
-        save_memory(name_a, new_mem_a)
-        save_memory(name_b, new_mem_b)
+        save_memory(name_a, new_mem_a, mem_a_kb)
+        save_memory(name_b, new_mem_b, mem_b_kb)
     if out_path:
         p = pathlib.Path(out_path)
         p.parent.mkdir(parents=True, exist_ok=True)

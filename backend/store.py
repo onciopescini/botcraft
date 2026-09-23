@@ -52,6 +52,9 @@ def init():
       mid INTEGER NOT NULL, bettor TEXT NOT NULL, pick TEXT NOT NULL,
       amount INTEGER NOT NULL, settled INTEGER NOT NULL DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS xp(
+      name TEXT PRIMARY KEY, xp INTEGER NOT NULL DEFAULT 0
+    );
     """)
     con.commit()
     for ddl in ("ALTER TABLE agents ADD COLUMN elo_squad REAL NOT NULL DEFAULT 1200",
@@ -145,6 +148,7 @@ def finish_match(mid: int, winner: int, s0: int, s1: int, h: str):
         if m["b"] != "daily-rival":
             daily_submit(m["b"], s1)
         settle_bets(mid, winner)
+        award_xp(mid, winner, s0, s1)
         return
     squad = (m["mode"] == "squad")
     blitz = (m["mode"] == "blitz")
@@ -172,6 +176,7 @@ def finish_match(mid: int, winner: int, s0: int, s1: int, h: str):
     con.commit()
     con.close()
     settle_bets(mid, winner)
+    award_xp(mid, winner, s0, s1)
 
 
 def fork_agent(src: str, new_name: str):
@@ -238,6 +243,51 @@ def pending_count() -> int:
     row = con.execute("SELECT COUNT(*) c FROM matches WHERE status='pending'").fetchone()
     con.close()
     return row["c"]
+
+
+XP_BASE = {"blitz": 10, "1v1": 20, "squad": 30, "daily": 15}
+
+
+def level_of(xp: int) -> int:
+    return xp // 100
+
+
+def bonus_of(level: int) -> tuple[int, int]:
+    """(mem_kb_extra, ping_extra). Auto: pari +1KB (cap 20KB tot), dispari +1 ping (cap 3)."""
+    mem = min(10, (level + 1) // 2)
+    ping = min(2, level // 2)
+    return mem, 1 + ping  # 1 ping base + bonus
+
+
+def get_progress(name: str) -> dict:
+    con = connect()
+    row = con.execute("SELECT xp FROM xp WHERE name=?", (name,)).fetchone()
+    con.close()
+    xp = row["xp"] if row else 0
+    lv = level_of(xp)
+    mem, ping = bonus_of(lv)
+    return {"xp": xp, "level": lv, "mem_kb": 10 + mem, "pings": ping}
+
+
+def award_xp(mid: int, winner: int, s0: int, s1: int):
+    con = connect()
+    m = con.execute("SELECT * FROM matches WHERE id=?", (mid,)).fetchone()
+    if not m:
+        con.close()
+        return
+    base = XP_BASE.get(m["mode"], 20)
+    for name, score, won in ((m["a"], s0, winner == 0), (m["b"], s1, winner == 1)):
+        ag = con.execute("SELECT * FROM agents WHERE name=?", (name,)).fetchone()
+        opp = m["b"] if name == m["a"] else m["a"]
+        op = con.execute("SELECT * FROM agents WHERE name=?", (opp,)).fetchone()
+        ecol = {"squad": "elo_squad", "blitz": "elo_blitz"}.get(m["mode"], "elo")
+        gap = max(0.0, (op[ecol] if op else 1200) - (ag[ecol] if ag else 1200)) if ag else 0.0
+        mult = 1.0 + min(1.0, gap / 800.0)
+        pts = round(base * mult * (1.0 if won else (0.5 if winner == -1 else 0.25)))
+        con.execute("INSERT INTO xp(name,xp) VALUES(?,?) "
+                    "ON CONFLICT(name) DO UPDATE SET xp=xp+?", (name, pts, pts))
+    con.commit()
+    con.close()
 
 
 def daily_seed() -> tuple[str, int]:
