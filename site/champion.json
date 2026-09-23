@@ -1,12 +1,12 @@
 {
-  "ts": 1790098349,
-  "title": "pre-lancio",
-  "champion": "bot-greedy2",
+  "ts": 1790175507,
+  "title": "ci-fresh",
+  "champion": "auto-greedy",
   "final": {
-    "a": "bot-greedy2",
-    "b": "t-greedy1",
-    "s0": 35,
-    "s1": 28
+    "a": "auto-greedy",
+    "b": "auto-jev",
+    "s0": 116,
+    "s1": 72
   },
-  "share": "/viewer/?match=demo"
+  "share": "/viewer/?match=tourney-1790175507-final"
 }

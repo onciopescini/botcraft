@@ -23,6 +23,8 @@ def main():
     if args.names:
         names = [n.strip() for n in args.names.split(",") if n.strip()]
     else:
+        import backend.store as _S0
+        _S0.init()
         names = [r["name"] for r in leaderboard()[:8]]
     if len(names) < 8:
         import backend.store as _S
