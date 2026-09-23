@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Botcraft — daily seed</title>
+<style>
+  body { font-family:system-ui,sans-serif; background:#0b0e14; color:#e6e6e6; margin:0; padding:24px; }
+  a { color:#7db4ff; } input, button { background:#24314d; color:#fff; border:1px solid #3a4c72; border-radius:6px; padding:6px 10px; }
+  table { border-collapse:collapse; } th, td { border-bottom:1px solid #24314d; padding:6px 10px; text-align:left; font-size:14px; }
+  .row { display:flex; gap:8px; margin:12px 0; align-items:center; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<h1>Daily seed — stesso seed per tutti, 1 submit/giorno</h1>
+<div class="row">
+  <label>API <input id="api" value="https://botcraft-6tjh.onrender.com" size="28"/></label>
+  <button id="go">classifica di oggi</button>
+  <a href="./leaderboard.html">ladder</a>
+</div>
+<p id="seed"></p>
+<table id="board"></table>
+<script>
+const $ = id => document.getElementById(id);
+async function load() {
+  const base = $('api').value.replace(/\/$/, '');
+  const d = await (await fetch(`${base}/daily`)).json();
+  $('seed').textContent = `giorno ${d.day} · seed ${d.seed} · POST /daily {"name": "tuo-bot"} per giocare`;
+  $('board').innerHTML = '<tr><th>#</th><th>bot</th><th>punti</th></tr>' +
+    (d.board.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.score}</td></tr>`).join('') || '<tr><td colspan=3>nessuno oggi — sii il primo</td></tr>');
+}
+$('go').onclick = load;
+load();
+</script>
+</body>
+</html>

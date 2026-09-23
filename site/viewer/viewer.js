@@ -4,6 +4,8 @@ import * as THREE from 'three';
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0e14);
 const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 500);
@@ -12,9 +14,14 @@ camera.position.set(16, 34, 26);
 camera.lookAt(16, 0, 16);
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+const sun = new THREE.DirectionalLight(0xfff2d9, 0.9);
 sun.position.set(20, 30, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.camera.left = -20; sun.shadow.camera.right = 20;
+sun.shadow.camera.top = 20; sun.shadow.camera.bottom = -20;
 scene.add(sun);
+scene.fog = new THREE.Fog(0x0b0e14, 45, 95); // profondità, i bordi svaniscono
 
 const BOARD = 32;
 function xz(x, z) { return [x - BOARD / 2 + 0.5, z - BOARD / 2 + 0.5]; }
@@ -28,6 +35,7 @@ function xz(x, z) { return [x - BOARD / 2 + 0.5, z - BOARD / 2 + 0.5]; }
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(cx, 0, cz);
+  floor.receiveShadow = true;
   scene.add(floor);
   const grid = new THREE.GridHelper(BOARD, BOARD, 0x33415e, 0x232f47);
   grid.position.y = 0.01;
@@ -82,6 +90,42 @@ const agent1c = new THREE.Mesh(agentGeo, agentMat1c);
 const agent2b = new THREE.Mesh(agentGeo, agentMat2b);
 const agent2c = new THREE.Mesh(agentGeo, agentMat2c);
 for (const m of [agent1b, agent1c, agent2b, agent2c]) { m.position.y = 0.9; m.visible = false; scene.add(m); }
+for (const m of [agent1, agent2, agent1b, agent1c, agent2b, agent2c]) m.castShadow = true;
+// etichette nomi sopra i capitani (diep.io style)
+function makeLabel(text, color) {
+  const cv = document.createElement('canvas');
+  cv.width = 256; cv.height = 64;
+  const g = cv.getContext('2d');
+  g.font = 'bold 30px system-ui, sans-serif';
+  g.textAlign = 'center';
+  g.fillStyle = 'rgba(0,0,0,0.55)';
+  const w = g.measureText(text).width + 24;
+  g.fillRect(128 - w / 2, 6, w, 44);
+  g.fillStyle = color;
+  g.fillText(text, 128, 40);
+  const tex = new THREE.CanvasTexture(cv);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+  sp.scale.set(3.4, 0.85, 1);
+  return sp;
+}
+let label1 = makeLabel('Blu', '#4da3ff'), label2 = makeLabel('Rosso', '#ff5d5d');
+scene.add(label1, label2);
+function setNames(n1, n2) {
+  scene.remove(label1, label2);
+  label1 = makeLabel(n1.slice(0, 14), '#4da3ff');
+  label2 = makeLabel(n2.slice(0, 14), '#ff5d5d');
+  scene.add(label1, label2);
+}
+// feed eventi spettatore (kill feed)
+function feed(html) {
+  const el = document.getElementById('feed');
+  if (!el) return;
+  if (el.textContent.startsWith('nessun evento')) el.textContent = '';
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  el.prepend(d);
+  while (el.children.length > 12) el.lastChild.remove();
+}
 dressBot(agent1, 0x1e3a5f); dressBot(agent2, 0x5f1e1e);
 dressBot(agent1b, 0x1e3a5f); dressBot(agent1c, 0x1e3a5f);
 dressBot(agent2b, 0x5f1e1e); dressBot(agent2c, 0x5f1e1e);
@@ -100,6 +144,20 @@ const wallGeo = new THREE.BoxGeometry(0.9, 0.9, 0.9);
 const wallMat = new THREE.MeshStandardMaterial({ color: 0xc9a06a });
 const goldGeo = new THREE.OctahedronGeometry(0.45);
 const goldMat = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0x554400 });
+// sudden death: anello rosso = fuori zona sicura (raggio dal replay, centro totem)
+const gasMat = new THREE.MeshBasicMaterial({ color: 0xff2222, transparent: true, opacity: 0.16, side: THREE.DoubleSide });
+const gasMesh = new THREE.Mesh(new THREE.RingGeometry(0.93, 1.0, 72), gasMat);
+gasMesh.rotation.x = -Math.PI / 2;
+gasMesh.visible = false;
+scene.add(gasMesh);
+// ping coach: diamante oro sulla cella indicata
+const pingGeo = new THREE.OctahedronGeometry(0.5);
+const pingMat1 = new THREE.MeshBasicMaterial({ color: 0x4da3ff });
+const pingMat2 = new THREE.MeshBasicMaterial({ color: 0xff5d5d });
+const ping1 = new THREE.Mesh(pingGeo, pingMat1);
+const ping2 = new THREE.Mesh(pingGeo, pingMat2);
+ping1.visible = ping2.visible = false;
+scene.add(ping1, ping2);
 // particelle leggere: pool di cubetti riusati (gather verde/grigio/oro, KO arancione)
 const partGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16);
 const parts = [];
@@ -134,8 +192,22 @@ let prevSnap = null;
 let topTick = 0; // top-moment auto: primo KO o danno max
 // hp mostrati (animati verso il target invece di snap)
 const dispHp = new Map();
-// audio WebAudio, muto default
-let AC = null, audioOn = false;
+// impostazioni persistenti (stile surviv.io)
+const SET = Object.assign({ q: 'high', shake: true, slow: true, audio: false },
+  JSON.parse(localStorage.getItem('botcraft-set') || '{}'));
+function saveSet() { try { localStorage.setItem('botcraft-set', JSON.stringify(SET)); } catch {} }
+function applySet() {
+  renderer.setPixelRatio(SET.q === 'high' ? Math.min(devicePixelRatio, 2) : 1);
+  const t = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
+  t('set-q', 'qualità: ' + (SET.q === 'high' ? 'alta' : 'bassa'));
+  t('set-shake', 'shake: ' + (SET.shake ? 'on' : 'off'));
+  t('set-slow', 'slow-mo: ' + (SET.slow ? 'on' : 'off'));
+  t('set-audio2', 'audio: ' + (SET.audio ? 'on' : 'off'));
+  t('audio', 'audio: ' + (SET.audio ? 'on' : 'off'));
+}
+// audio WebAudio (rispetta impostazione salvata)
+let AC = null, audioOn = !!SET.audio;
+applySet();
 function blip(freq, dur = 0.06, vol = 0.08) {
   if (!audioOn) return;
   try {
@@ -173,6 +245,10 @@ function parseReplay(text, name) {
   slowmoUntil = 0;
   document.getElementById('stats').classList.remove('loading');
   document.getElementById('src').textContent = name || 'replay caricato';
+  const feedEl = document.getElementById('feed');
+  if (feedEl) feedEl.textContent = 'nessun evento…';
+  const qp = new URLSearchParams(location.search);
+  setNames(qp.get('p1') || 'Blu', qp.get('p2') || 'Rosso');
   // top-moment: primo KO, altrimenti tick del danno singolo max
   topTick = 0;
   let best = 0;
@@ -194,6 +270,8 @@ function drawFrame(a, b, alpha) {
   const [x2, z2] = xz(lerp(a.p2.x, b.p2.x), lerp(a.p2.y, b.p2.y));
   agent1.position.x = x1; agent1.position.z = z1;
   agent2.position.x = x2; agent2.position.z = z2;
+  label1.position.set(x1, 2.4 * agent1.scale.y + 0.6, z1);
+  label2.position.set(x2, 2.4 * agent2.scale.y + 0.6, z2);
   // altezza = hp animati (feedback visivo), spada = emissive, flash bianco sul danno
   smoothHp(agent1, 'a1', a.p1.hp);
   smoothHp(agent2, 'a2', a.p2.hp);
@@ -214,11 +292,13 @@ function drawFrame(a, b, alpha) {
     if (dw2 > 0) { burst(agent2.position.x, agent2.position.z, 0x3fae5a, 8); blip(660); }
     if (ds2 > 0) { burst(agent2.position.x, agent2.position.z, 0x9aa3b2, 8); blip(520); }
     if (dg2 > 0) { burst(agent2.position.x, agent2.position.z, 0xffd700, 12); blip(880); }
-    for (const [P, Q, mesh] of [[prevSnap.p1, a.p1, agent1], [prevSnap.p2, a.p2, agent2]]) {
+    for (const [P, Q, mesh, nm] of [[prevSnap.p1, a.p1, agent1, 'Blu'], [prevSnap.p2, a.p2, agent2, 'Rosso']]) {
       if (P.hp > Q.hp) blip(180, 0.09);
+      if (!P.sword && Q.sword) feed(`tick ${a.tick}: <b>${nm}</b> costruisce la spada`);
       if (P.hp > 0 && Q.hp <= 0) {
         burst(mesh.position.x, mesh.position.z, 0xff7a00, 40, 5);
         blip(90, 0.25, 0.12);
+        feed(`tick ${a.tick}: <b style="color:#ff5d5d">KO!</b> ${nm} cade`);
         slowmoUntil = performance.now() + 2000;
         shakeUntil = performance.now() + 450;
       }
@@ -263,6 +343,24 @@ function drawFrame(a, b, alpha) {
     m.position.set(x, 0.5, z);
     dyn.add(m);
   }
+  // zona death + ping coach dal replay
+  const gas = (typeof a.gas === 'number') ? a.gas : 99;
+  if (gas < 90) {
+    const [tx, tz] = xz(16, 16);
+    gasMesh.visible = true;
+    gasMesh.position.set(tx, 0.06, tz);
+    gasMesh.scale.set(gas, gas, 1);
+  } else gasMesh.visible = false;
+  const showPing = (mesh, c, tick) => {
+    if (c && typeof c.x === 'number' && tick >= c.tick) {
+      const [x, z] = xz(c.x, c.y);
+      mesh.visible = true;
+      mesh.position.set(x, 0.6 + 0.2 * Math.sin(performance.now() / 300), z);
+      mesh.rotation.y += 0.05;
+    } else mesh.visible = false;
+  };
+  showPing(ping1, a.c1, a.tick);
+  showPing(ping2, a.c2, a.tick);
   for (const key of (a.walls || [])) {
     const [wx, wy] = key.split(',').map(Number);
     const [x, z] = xz(wx, wy);
@@ -333,18 +431,17 @@ function loop(now) {
   const dt = (now - last) / 1000;
   last = now;
   if (frames.length && playing) {
-    const eff = performance.now() < slowmoUntil ? 0.25 : 1; // slow-mo KO
+    const eff = (SET.slow && performance.now() < slowmoUntil) ? 0.25 : 1; // slow-mo KO
     tFloat += dt * 2 * speed * eff;
     if (tFloat >= frames.length - 1) tFloat = 0; // loop
     elTick.value = Math.floor(tFloat);
-    const tag = performance.now() < slowmoUntil ? ' (slow-mo KO!)' : '';
+    const tag = (SET.slow && performance.now() < slowmoUntil) ? ' (slow-mo KO!)' : '';
     elLabel.textContent = `tick ${Math.floor(tFloat)}/${frames.length - 1}${tag}`;
   }
   if (frames.length) {
     const i = Math.min(frames.length - 2, Math.floor(tFloat));
     drawFrame(frames[i], frames[i + 1], tFloat - i);
-    if (camMode === 'follow') {
-      // punto medio dei capitani (o delle 6 unità se v2)
+    if (camMode === 'follow') {      // punto medio dei capitani (o delle 6 unità se v2)
       const f = frames[Math.floor(tFloat)];
       const pts = (Array.isArray(f.t1) && Array.isArray(f.t2)) ? [...f.t1, ...f.t2] : [f.p1, f.p2];
       const mx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
@@ -353,11 +450,16 @@ function loop(now) {
       camera.position.set(wx, 18, wz + 14);
       camera.lookAt(wx, 0, wz);
     } else {
-      camera.position.set(16, 34, 26);
-      camera.lookAt(16, 0, 16);
+      // orbita: trascina (mouse+touch) per ruotare, pinch per zoom
+      const cx = 0, cz = 0;
+      camera.position.set(
+        cx + orbit.r * Math.sin(orbit.phi) * Math.sin(orbit.theta),
+        orbit.r * Math.cos(orbit.phi),
+        cz + orbit.r * Math.sin(orbit.phi) * Math.cos(orbit.theta));
+      camera.lookAt(cx, 0, cz);
     }
     const nowS = performance.now();
-    if (nowS < shakeUntil) {
+    if (SET.shake && nowS < shakeUntil) {
       const k = (shakeUntil - nowS) / 450; // decade
       camera.position.x += (Math.random() - 0.5) * 2.4 * k;
       camera.position.y += (Math.random() - 0.5) * 1.6 * k;
@@ -369,6 +471,32 @@ function loop(now) {
 }
 requestAnimationFrame(loop);
 let camMode = 'orbit';
+// orbita touch+mouse: drag ruota, pinch zoom (solo in modalità orbita)
+const orbit = { theta: 0, phi: 0.28, r: 36 };
+{
+  let last = null, pinch = 0;
+  canvas.style.touchAction = 'none';
+  const pos = e => ({ x: e.clientX ?? e.touches?.[0]?.clientX, y: e.clientY ?? e.touches?.[0]?.clientY });
+  canvas.addEventListener('pointerdown', e => { last = pos(e); canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', e => {
+    if (!last || camMode !== 'orbit') return;
+    const p = pos(e);
+    orbit.theta -= (p.x - last.x) * 0.006;
+    orbit.phi = Math.min(1.35, Math.max(0.15, orbit.phi - (p.y - last.y) * 0.004));
+    last = p;
+  });
+  const end = () => { last = null; pinch = 0; };
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+  canvas.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && camMode === 'orbit') {
+      e.preventDefault();
+      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      if (pinch) orbit.r = Math.min(70, Math.max(14, orbit.r * (pinch / d)));
+      pinch = d;
+    }
+  }, { passive: false });
+}
 
 document.getElementById('file').addEventListener('change', async (e) => {
   const f = e.target.files[0];
@@ -397,9 +525,20 @@ document.getElementById('top').addEventListener('click', () => {
     elTick.value = Math.floor(tFloat);
   }
 });
-document.getElementById('audio').addEventListener('click', (e) => {
-  audioOn = !audioOn;
-  e.target.textContent = audioOn ? 'audio: on' : 'audio: off';
+function toggleAudio(e) {
+  SET.audio = !SET.audio; audioOn = SET.audio; saveSet(); applySet();
+  if (SET.audio) blip(440, 0.08);
+}
+document.getElementById('audio').addEventListener('click', toggleAudio);
+document.getElementById('set-audio2').addEventListener('click', toggleAudio);
+document.getElementById('set-q').addEventListener('click', () => {
+  SET.q = SET.q === 'high' ? 'low' : 'high'; saveSet(); applySet(); resize();
+});
+document.getElementById('set-shake').addEventListener('click', (e) => {
+  SET.shake = !SET.shake; saveSet(); applySet();
+});
+document.getElementById('set-slow').addEventListener('click', (e) => {
+  SET.slow = !SET.slow; saveSet(); applySet();
 });
 document.getElementById('cam').addEventListener('click', (e) => {  camMode = camMode === 'orbit' ? 'follow' : 'orbit';
   e.target.textContent = camMode === 'orbit' ? 'camera: orbita' : 'camera: follow';
