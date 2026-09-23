@@ -31,6 +31,14 @@ def require_token(req: Request) -> str:
     raise HTTPException(401, "serve Bearer token (API_TOKENS o login Discord)")
 
 app = FastAPI(title="Botcraft S1")
+from fastapi.responses import JSONResponse
+
+
+@app.exception_handler(Exception)
+async def _json_500(req: Request, exc: Exception):
+    if isinstance(exc, HTTPException):
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+    return JSONResponse({"detail": "errore interno, riprova"}, status_code=500)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://localhost:8080,http://localhost:8000").split(",")],

@@ -58,14 +58,32 @@ def run_once() -> dict | None:
     return {"id": m["id"], **res}
 
 
+def run_once_safe():
+    """Mai morire: match bacato -> failed, si passa oltre."""
+    try:
+        return run_once()
+    except Exception as e:
+        try:
+            from backend.store import next_pending as _np, mark_failed
+            m = _np()
+            if m:
+                mark_failed(m["id"], f"{type(e).__name__}")
+                print(f"match {m['id']} fallito ({type(e).__name__}), continuo.")
+        except Exception:
+            pass
+        return {"id": -1, "failed": True}
+
+
 if __name__ == "__main__":
     import time
     n = 0
     while True:
-        r = run_once()
+        r = run_once_safe()
         if not r:
             print("coda vuota, stop.")
             break
+        if r.get("failed"):
+            continue
         n += 1
         print(f"match {r['id']}: winner={r['winner']} {r['s0']}-{r['s1']} hash={r['hash']}")
         if "--once" in sys.argv:

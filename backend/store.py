@@ -11,8 +11,13 @@ DB = pathlib.Path(__file__).resolve().parents[1] / "backend" / "botcraft.db"
 
 def connect():
     DB.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(str(DB))
+    con = sqlite3.connect(str(DB), timeout=30.0)
     con.row_factory = sqlite3.Row
+    try:
+        con.execute("PRAGMA journal_mode=WAL")
+        con.execute("PRAGMA busy_timeout=30000")
+    except Exception:
+        pass
     return con
 
 
@@ -137,6 +142,13 @@ def next_pending():
     row = con.execute("SELECT * FROM matches WHERE status='pending' ORDER BY id LIMIT 1").fetchone()
     con.close()
     return dict(row) if row else None
+
+
+def mark_failed(mid: int, reason: str):
+    con = connect()
+    con.execute("UPDATE matches SET status='failed',hash=? WHERE id=?", (reason[:64], mid))
+    con.commit()
+    con.close()
 
 
 def finish_match(mid: int, winner: int, s0: int, s1: int, h: str):

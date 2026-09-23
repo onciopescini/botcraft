@@ -347,6 +347,16 @@ document.getElementById('clip').addEventListener('click', (e) => {
     setTimeout(() => btn.textContent = 'clip 15s', 2000);
   }
 });
+document.getElementById('snap').addEventListener('click', () => {
+  // foto PNG del frame corrente: card pronta per X/Discord
+  try {
+    renderer.render(scene, camera);
+    const a = document.createElement('a');
+    a.href = renderer.domElement.toDataURL('image/png');
+    a.download = `botcraft-tick${Math.floor(tFloat)}.png`;
+    a.click();
+  } catch {}
+});
 document.getElementById('share').addEventListener('click', () => {
   navigator.clipboard.writeText(location.href);
   document.getElementById('share').textContent = 'link copiato!';
