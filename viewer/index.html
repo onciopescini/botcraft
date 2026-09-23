@@ -4,6 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Botcraft — replay 3D</title>
+<link rel="stylesheet" href="../design.css"/>
 <style>
   :root { --panel:#141a26f2; --line:#3a4c72; --blu:#4da3ff; --oro:#ffd700; }
   body { margin:0; font-family:system-ui,-apple-system,sans-serif; background:#0b0e14; color:#e6e6e6; }
@@ -23,6 +24,8 @@
   input[type=file] { font-size:12px; max-width:100%; }
   input[type=file]::file-selector-button { background:#24314d; color:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 12px; cursor:pointer; }
   #tick { width:100%; accent-color:var(--oro); }
+  #marks { position:absolute; left:0; right:0; top:-4px; height:6px; pointer-events:none; }
+  #marks i { position:absolute; width:6px; height:6px; border-radius:50%; background:#ff5d5d; transform:translateX(-3px); }
   #ticklabel { font-size:12px; font-variant-numeric:tabular-nums; }
   #stats { font-size:12px; line-height:1.55; white-space:pre-wrap; background:#0b0e14; border-radius:8px; padding:8px; min-height:64px; }
   #stats.loading { opacity:.55; }
@@ -54,11 +57,15 @@
   </section>
   <section>
     <h2>Playback <span id="ticklabel">tick 0/0</span></h2>
-    <div class="row"><input type="range" id="tick" min="0" max="0" value="0"/></div>
+    <div class="row" style="position:relative;" id="tlwrap"><input type="range" id="tick" min="0" max="0" value="0"/><div id="marks"></div></div>
+    <div class="row" id="hpbars">
+      <div style="flex:1;background:#0b0e14;border-radius:6px;height:10px;overflow:hidden;"><div id="hp1" style="height:100%;width:100%;background:#4da3ff;transition:width .15s;"></div></div>
+      <div style="flex:1;background:#0b0e14;border-radius:6px;height:10px;overflow:hidden;"><div id="hp2" style="height:100%;width:100%;background:#ff5d5d;transition:width .15s;"></div></div>
+    </div>
     <div class="row">
       <button id="play">pausa</button>
       <button id="cam">camera: orbita</button>
-      <button id="audio">audio: off</button>
+      <button id="full">schermo intero</button>
       <select id="speed" aria-label="velocità"><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option></select>
     </div>
   </section>

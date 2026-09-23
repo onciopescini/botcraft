@@ -38,12 +38,18 @@ function parseReplay(text, name) {
   setNames(qp.get('p1') || 'Blu', qp.get('p2') || 'Rosso');
   topTick = 0;
   let best = 0;
+  const kos = [];
   for (let i = 1; i < frames.length; i++) {
     const P = frames[i - 1], Q = frames[i];
     const d = (P.p1.hp - Q.p1.hp) + (P.p2.hp - Q.p2.hp);
-    if ((P.p1.hp > 0 && Q.p1.hp <= 0) || (P.p2.hp > 0 && Q.p2.hp <= 0)) { topTick = i; break; }
-    if (d > best) { best = d; topTick = i; }
+    if ((P.p1.hp > 0 && Q.p1.hp <= 0) || (P.p2.hp > 0 && Q.p2.hp <= 0)) {
+      if (!topTick) topTick = i;
+      kos.push(i);
+    }
+    if (d > best) { best = d; if (!topTick) topTick = i; }
   }
+  document.getElementById('marks').innerHTML = kos.map(t =>
+    `<i style="left:${(t / Math.max(1, frames.length - 1)) * 100}%" title="KO tick ${t}"></i>`).join('');
   elTick.max = Math.max(0, frames.length - 1);
   elTick.value = 0;
   elLabel.textContent = `tick 0/${frames.length - 1}`;
@@ -147,6 +153,8 @@ function drawFrame(a, b, alpha) {
   showPing(ping1, a.c1, a.tick);
   showPing(ping2, a.c2, a.tick);
   const g1 = a.p1.gold || 0, g2 = a.p2.gold || 0;
+  document.getElementById('hp1').style.width = Math.max(0, a.p1.hp) + '%';
+  document.getElementById('hp2').style.width = Math.max(0, a.p2.hp) + '%';
   const msg = (a.m1 || a.m2) ? `\nmsg P1:"${a.m1 || ''}" P2:"${a.m2 || ''}"` : '';
   elStats.textContent =
     `P1 blu hp=${a.p1.hp} legna=${a.p1.wood} pietra=${a.p1.stone} gold=${g1} spada=${a.p1.sword ? 'si' : 'no'} [${a.a1}]\n` +
@@ -294,6 +302,12 @@ document.getElementById('top').addEventListener('click', () => {
 document.getElementById('cam').addEventListener('click', (e) => {
   camMode = camMode === 'orbit' ? 'follow' : 'orbit';
   e.target.textContent = camMode === 'orbit' ? 'camera: orbita' : 'camera: follow';
+});
+document.getElementById('full').addEventListener('click', async (e) => {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await document.documentElement.requestFullscreen();
+  } catch {}
 });
 function toggleAudio() {
   SET.audio = !SET.audio; setAudio(SET.audio); saveSet(); applySettings();

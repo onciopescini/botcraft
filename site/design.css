@@ -1,0 +1,45 @@
+/* Botcraft design system — un file, tutte le pagine. */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap');
+:root {
+  --bg: #0b0e14;
+  --bg2: #101623;
+  --panel: #141a26;
+  --line: #24314d;
+  --line2: #3a4c72;
+  --txt: #e6e6e6;
+  --mut: #9aa7bd;
+  --blu: #4da3ff;
+  --rosso: #ff5d5d;
+  --oro: #ffd700;
+  --verde: #3fae5a;
+  --r: 14px;
+  --font: "Space Grotesk", system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font); background: var(--bg); color: var(--txt); line-height: 1.55; }
+a { color: #7db4ff; }
+button, select, input[type=text], input:not([type]) {
+  background: #1a2338; color: #fff; border: 1px solid var(--line2);
+  border-radius: 10px; padding: 9px 14px; font-family: var(--font); font-size: 14px;
+}
+button { cursor: pointer; font-weight: 500; }
+button:hover, select:hover { border-color: var(--blu); }
+button.go { background: var(--oro); color: #141414; border-color: var(--oro); font-weight: 700; }
+button.go:hover { filter: brightness(1.08); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+.hint, .fine { color: var(--mut); font-size: 12.5px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.badge { display: inline-block; background: #1a2338; border: 1px solid var(--line2); border-radius: 20px; padding: 3px 12px; margin: 3px; font-size: 13px; }
+.badge.gold { border-color: var(--oro); color: var(--oro); }
+.topnav { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 12px;
+  padding: 12px 24px; background: #0b0e14ee; border-bottom: 1px solid var(--line); backdrop-filter: blur(6px); }
+.topnav img { width: 32px; height: 32px; }
+.topnav a { color: var(--mut); text-decoration: none; font-size: 14px; margin-left: 16px; }
+.topnav a:hover { color: #fff; }
+.wrap { max-width: 1120px; margin: auto; padding: 0 24px; }
+footer.site { border-top: 1px solid var(--line); padding: 28px 24px; color: var(--mut); font-size: 13px; text-align: center; }
+footer.site a { margin: 0 8px; }
+.skel td { color: transparent !important; background: linear-gradient(90deg,#1a2338,#24314d,#1a2338);
+  background-size: 200% 100%; animation: sh 1.2s infinite; border-radius: 6px; }
+@keyframes sh { to { background-position: -200% 0; } }

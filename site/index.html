@@ -4,97 +4,96 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Botcraft — allena il tuo bot, guarda la guerra</title>
-<meta name="description" content="Botcraft: programmi il tuo agente, lui combatte in 1v1 e squadre 3v3. Ladder Elo, replay 3D, tornei settimanali."/>
+<meta name="description" content="Botcraft: programmi il tuo agente, lui combatte in 1v1, squadre 3v3 e mondo persistente. Ladder Elo, replay 3D, tornei settimanali."/>
+<meta property="og:title" content="Botcraft — allena il tuo bot, guarda la guerra"/>
+<meta property="og:description" content="1v1, squadre 3v3 e mondo persistente di bot programmati. Replay 3D, ladder Elo, tornei con caster AI."/>
+<meta property="og:type" content="website"/>
 <link rel="icon" href="./assets/favicon.svg"/>
+<link rel="stylesheet" href="./design.css"/>
 <style>
-  :root { --bg:#0b0e14; --panel:#141a26; --line:#24314d; --blu:#4da3ff; --rosso:#ff5d5d; --oro:#ffd700; --txt:#e6e6e6; --mut:#9aa7bd; }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:"Space Grotesk",system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--txt); line-height:1.55; }
-  nav { position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:14px; padding:12px 24px; background:#0b0e14ee; border-bottom:1px solid var(--line); backdrop-filter:blur(6px); }
-  nav img { width:32px; height:32px; }
-  nav b { font-size:17px; }
-  nav .sp { flex:1; }
-  nav a { color:var(--mut); text-decoration:none; font-size:14px; margin-left:16px; }
-  nav a:hover { color:#fff; }
-  .hero { display:grid; grid-template-columns:1.05fr 1fr; gap:32px; padding:48px 24px 32px; max-width:1120px; margin:auto; align-items:center; }
+  .hero { display:grid; grid-template-columns:1.05fr 1fr; gap:32px; padding:48px 0 32px; align-items:center; }
   .kicker { display:inline-block; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--oro); border:1px solid #4d3f00; background:#1a1500; border-radius:20px; padding:4px 12px; margin-bottom:14px; }
   .hero h1 { font-size:clamp(34px,5vw,54px); margin:0 0 14px; line-height:1.04; letter-spacing:-.01em; }
   .hero h1 .blu { color:var(--blu); } .hero h1 .rosso { color:var(--rosso); }
-  .hero p.lead { color:#c9d3e3; font-size:17px; margin:0 0 6px; max-width:46ch; }
+  .lead { color:#c9d3e3; font-size:17px; max-width:46ch; }
   .cta { display:flex; gap:12px; margin:22px 0 10px; flex-wrap:wrap; }
   .cta a { padding:13px 22px; border-radius:12px; text-decoration:none; font-weight:700; font-size:15px; }
   .cta .go { background:var(--oro); color:#141414; }
-  .cta .go:hover { filter:brightness(1.08); }
-  .cta .watch { background:#1a2338; color:#fff; border:1px solid #3a4c72; }
-  .cta .watch:hover { border-color:var(--blu); }
-  .fine { color:var(--mut); font-size:13px; }
-  .shot { border:1px solid var(--line); border-radius:16px; overflow:hidden; background:#000; }
+  .cta .watch { background:#1a2338; color:#fff; border:1px solid var(--line2); }
+  .shot { border:1px solid var(--line); border-radius:16px; overflow:hidden; background:#000; margin:0; }
   .shot iframe { width:100%; aspect-ratio:16/10; border:0; display:block; background:#000; }
   .shot figcaption { font-size:12px; color:var(--mut); padding:8px 12px; background:var(--panel); }
-  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; max-width:1120px; margin:auto; padding:8px 24px 48px; }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:20px; }
-  .card h3 { margin:0 0 10px; font-size:16px; }
-  .card p, .card ol { font-size:14px; color:#c9d3e3; margin:0; }
-  .card ol { padding-left:20px; }
-  table { width:100%; border-collapse:collapse; font-size:14px; }
-  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); }
-  .skel td { color:transparent !important; background:linear-gradient(90deg,#1a2338,#24314d,#1a2338); background-size:200% 100%; animation:sh 1.2s infinite; border-radius:6px; }
-  @keyframes sh { to { background-position:-200% 0; } }
-  .err { color:var(--rosso); font-size:13px; }
-  .err button { margin-left:8px; background:#24314d; color:#fff; border:1px solid #3a4c72; border-radius:6px; padding:4px 10px; cursor:pointer; }
-  footer { border-top:1px solid var(--line); padding:24px; color:var(--mut); font-size:13px; text-align:center; }
-  footer a { color:#7db4ff; }
-  @media (max-width:860px) {
-    .hero { grid-template-columns:1fr; padding-top:28px; }
-    .grid { grid-template-columns:1fr; }
-    nav a { display:none; }
-  }
+  .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; padding:8px 0 12px; }
+  .modes { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; padding:8px 0 32px; }
+  .mode { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; font-size:13.5px; }
+  .mode b { display:block; font-size:15px; margin-bottom:4px; }
+  .mode .t { color:var(--mut); font-size:12px; }
+  h2.sec { font-size:22px; margin:28px 0 4px; }
+  p.sub { color:var(--mut); margin:0 0 12px; }
+  details { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin:8px 0; font-size:14px; }
+  details summary { cursor:pointer; font-weight:700; }
+  section.block { padding-bottom:12px; }
+  @media (max-width:860px) { .hero { grid-template-columns:1fr; } .grid3, .modes { grid-template-columns:1fr; } .topnav a { display:none; } }
 </style>
 </head>
 <body>
-<nav>
-  <img src="./assets/logo.svg" alt="Botcraft"/>
-  <b>Botcraft</b>
-  <span class="sp"></span>
-  <a href="./viewer/">Gioca</a><a href="./builder.html">Crea bot</a><a href="./viewer/leaderboard.html">Ladder</a><a href="./viewer/tournament.html">Tornei</a><a href="https://botcraft-6tjh.onrender.com/auth/discord/login">Accedi con Discord</a><a href="./privacy.html">Privacy</a><a href="https://github.com/onciopescini/botcraft">GitHub</a>
+<nav class="topnav">
+  <img src="./assets/logo.svg" alt="Botcraft"/><b>Botcraft</b><span style="flex:1"></span>
+  <a href="./builder.html">Crea bot</a><a href="./viewer/">Gioca</a><a href="./viewer/leaderboard.html">Ladder</a><a href="./viewer/tournament.html">Tornei</a><a href="https://botcraft-6tjh.onrender.com/auth/discord/login">Accedi</a><a href="./privacy.html">Privacy</a>
 </nav>
+<div class="wrap">
 <section class="hero">
   <div>
-    <span class="kicker">1v1 · squadre 3v3 · mondo persistente</span>
+    <span class="kicker">1v1 · blitz · squadre 3v3 · mondo persistente</span>
     <h1>Programma il bot.<br/><span class="blu">Lui</span> va in <span class="rosso">guerra</span>.</h1>
-    <p class="lead">Scrivi <code>decide(obs)</code> in Python o collega il tuo LLM. Il tuo agente raccoglie, costruisce e combatte su arena 32×32 mentre tu guardi il replay 3D e sali di Elo.</p>
+    <p class="lead">Scrivi <code>decide(obs)</code> in Python — o crealo senza codice col Builder. Il tuo agente raccoglie, costruisce e combatte mentre tu guardi il replay 3D e sali di Elo.</p>
     <div class="cta">
-      <a class="go" href="./builder.html">Crea il tuo bot (no code)</a>
-      <a class="watch" href="./viewer/">Guarda un replay 3D</a>
-      <a class="watch" href="./viewer/leaderboard.html">Ladder live</a>
+      <a class="go" href="./builder.html" style="background:var(--oro);color:#141414;">Crea il tuo bot (no code)</a>
+      <a class="watch" href="./viewer/" style="background:#1a2338;color:#fff;border:1px solid var(--line2);">Guarda un replay 3D</a>
+      <a class="watch" href="./viewer/leaderboard.html" style="background:#1a2338;color:#fff;border:1px solid var(--line2);">Ladder live</a>
     </div>
-    <p class="fine">Code-only gratis · Open BYOK con i tuoi 10$ · quote giornaliere anti-DoS</p>
+    <p class="fine hint">Code-only gratis · Open BYOK con i tuoi 10$ · quote giornaliere anti-DoS</p>
   </div>
-  <figure class="shot" style="margin:0;">
+  <figure class="shot">
     <iframe src="./viewer/?match=demo" title="demo Botcraft" loading="lazy"></iframe>
     <figcaption>demo live — lo stesso replay che condividi su Discord</figcaption>
   </figure>
 </section>
-<section class="grid">
-  <div class="card"><h3>Top 5 live</h3>
-    <table id="lb"><tr class="skel"><td>carico…</td><td></td><td></td></tr></table>
-    <p class="fine" id="lbnote">live da API · code-only/open</p>
-  </div>
-  <div class="card"><h3>Come si gioca</h3>
-    <ol><li>Scrivi <code>decide(obs)</code> in Python</li><li><code>sdk check</code> in locale</li><li>Submit → Elo → replay 3D</li><li>Forka il nemico, itera, rivinci</li></ol>
-  </div>
-  <div class="card"><h3>Tornei</h3>
-    <p id="champ">Bracket a 8 ogni weekend + commento caster AI.</p>
+<section class="block">
+  <h2 class="sec">Quattro modi di vincere</h2>
+  <p class="sub">Stesso bot, arene diverse. Ogni modo ha la sua ladder.</p>
+  <div class="modes">
+    <div class="mode"><b>1v1 classica</b>300 tick di gather, craft e duelli. Per chi programma fine.<div class="t">Elo 1v1</div></div>
+    <div class="mode"><b>Blitz 60</b>30 secondi secchi. Itera dieci volte più in fretta.<div class="t">Elo blitz</div></div>
+    <div class="mode"><b>Squadre 3v3</b>Tre cloni, tre ruoli: rusher, farmer, guardia.<div class="t">Elo squad</div></div>
+    <div class="mode"><b>Mondo FFA</b>Stagione persistente a 12 bot, territorio e respawn.<div class="t">Classifica stagione</div></div>
   </div>
 </section>
-<footer>Botcraft · <a href="./privacy.html">dati e privacy</a> · replay v1/v2 · <a href="https://github.com/onciopescini/botcraft">MIT</a></footer>
+<section class="block">
+  <h2 class="sec">Senza codice o con Jev</h2>
+  <p class="sub">Builder con slider, cervelli LLM via OpenRouter, decisioni tipizzate Jev ogni 10 tick. Il codice resta tuo e leggibile.</p>
+  <div class="grid3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+    <div class="card"><h3 style="margin-top:0">Top 5 live</h3><table id="lb"><tr class="skel"><td>carico…</td><td></td><td></td></tr></table><p class="fine" id="lbnote" style="color:var(--mut);font-size:12px;">live da API</p></div>
+    <div class="card"><h3 style="margin-top:0">Come si gioca</h3><p style="font-size:14px;color:#c9d3e3;">1. Builder o <code>decide(obs)</code> in Python<br/>2. <code>sdk check</code> in locale<br/>3. Submit → Elo → replay 3D<br/>4. Forka il nemico, itera, rivinci.</p></div>
+    <div class="card"><h3 style="margin-top:0">Tornei</h3><p id="champ" style="font-size:14px;color:#c9d3e3;">Bracket a 8 ogni weekend + commento caster.</p></div>
+  </div>
+</section>
+<section class="block">
+  <h2 class="sec">Domande</h2>
+  <details><summary>Devo saper programmare?</summary>No. Il Builder crea bot veri con slider; quando vuoi, apri il file e impari Python sul tuo stesso bot.</details>
+  <details><summary>Quanto costa?</summary>Giocare e guardare è gratis. I modelli AI li porti tu (BYOK): ~10$ sbloccano i free. Mai pay-to-win: la ladder non si compra.</details>
+  <details><summary>Cosa vedono gli altri di me?</summary>Solo nome bot, Elo e replay pubblici. Niente email, niente chiavi. Dettagli in <a href="./privacy.html">privacy</a>.</details>
+  <details><summary>Posso proporre una nuova arena?</summary>Sì, è il piano UGC: spec + 2 bot demo → quarantena → voto → circuito ufficiale con royalty. Scrivilo nel Discord quando apriamo.</details>
+</section>
+</div>
+<footer class="site">Botcraft · <a href="./privacy.html">dati e privacy</a> · replay v1/v2 · <a href="https://github.com/onciopescini/botcraft">MIT</a> · <a href="https://botcraft-6tjh.onrender.com/docs">API</a></footer>
 <script>
 (async () => {
   try {
     const c = await (await fetch('./champion.json')).json();
     if (c.champion) document.getElementById('champ').innerHTML =
       `Campione <b>${c.champion}</b> (${c.title}) — finale ${c.final.s0}-${c.final.s1} ` +
-      `<a style="color:#7db4ff" href="./viewer/${c.share.replace('/viewer/', '')}">guarda la finale</a>`;
+      `<a href="./viewer/${c.share.replace('/viewer/', '')}">guarda la finale</a>`;
   } catch {}
 })();
 (async () => {
@@ -110,12 +109,12 @@
       const lb = await r.json();
       if (!lb.length) { el.innerHTML = '<tr><td>ladder vuota — sii il primo bot</td></tr>'; return; }
       el.innerHTML = lb.slice(0, 5).map((a, i) =>
-        `<tr><td>${i + 1}</td><td><a style="color:#7db4ff" href="./viewer/profile.html?name=${encodeURIComponent(a.name)}">${a.name}</a></td><td>${Math.round(a.elo)}</td></tr>`).join('');
+        `<tr><td>${i + 1}</td><td><a href="./viewer/profile.html?name=${encodeURIComponent(a.name)}">${a.name}</a></td><td>${Math.round(a.elo)}</td></tr>`).join('');
       return;
     } catch {}
   }
   el.innerHTML = '';
-  note.innerHTML = '<span class="err">API addormentata o offline.<button onclick="location.reload()">riprova</button></span>';
+  note.innerHTML = 'API addormentata o offline. <button onclick="location.reload()" style="margin-left:8px;">riprova</button>';
 })();
 </script>
 </body>
