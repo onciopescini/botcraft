@@ -24,6 +24,19 @@ def main():
         names = [n.strip() for n in args.names.split(",") if n.strip()]
     else:
         names = [r["name"] for r in leaderboard()[:8]]
+    if len(names) < 8:
+        import backend.store as _S
+        defaults = [("auto-greedy", "greedy"), ("auto-bt", "bt"), ("auto-rush", "greedy"),
+                    ("auto-turtle", "greedy"), ("auto-rand", "random"), ("auto-jev", "greedy"),
+                    ("auto-llm", "greedy"), ("auto-sq", "squad")]
+        for n, p in defaults:
+            try:
+                _S.register_agent(n, p)
+            except Exception:
+                pass
+            if n not in names:
+                names.append(n)
+        names = names[:8]
     if len(names) != 8:
         sys.exit(f"servono 8 nomi, trovati {len(names)}: completa con --names")
     from backend.tournaments import run_bracket
