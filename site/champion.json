@@ -1,6 +1,6 @@
 {
-  "ts": 1790175507,
-  "title": "ci-fresh",
+  "ts": 1790175682,
+  "title": "serata-lampo",
   "champion": "auto-greedy",
   "final": {
     "a": "auto-greedy",
@@ -8,5 +8,5 @@
     "s0": 116,
     "s1": 72
   },
-  "share": "/viewer/?match=tourney-1790175507-final"
+  "share": "/viewer/?match=tourney-1790175682-final"
 }
