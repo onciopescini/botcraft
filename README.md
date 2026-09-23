@@ -37,7 +37,10 @@ Tutto in `docs/`:
 12. `12_LOOK_PLAN.md` — piano estetico alto livello (identità, viewer cinema, sociale, mondo)
 13. `13_S3_SPEC.md` — mondo persistente FFA, stagioni, territorio, replay delta
 14. `14_DEPLOY.md` — itch.io + Cloudflare Pages + Render gratis, checklist lancio
-
+15. `15_DATA_PRIVACY.md` — dati raccolti, usi, retention, diritti
+16. `16_RESEARCH.md` — tesoro dal web + backlog P0/P1/P2
+17. `17_GAME_DESIGN.md` — dal benchmark al gioco (gas, blitz, coach, daily, bets, bounty)
+18. `18_PHASE_A.md` — progressione: XP, prompt pack, boost, prestige (prossimo build)
 ## Cervelli disponibili (preset ladder)
 random · greedy · llm-greedy (OpenRouter BYOK) · **jev-greedy (TypeSafe Jev tattico ogni tick, early access)** · squad (3v3) · bt (behavior-tree didattico)
 

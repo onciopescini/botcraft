@@ -26,6 +26,9 @@ Prima login+playtest, poi controlli touch. Viewer già responsive bottom-sheet.
 
 ## ADR-009: MAI pay-to-win — DECISO 22/09/2026, permanente
 Solo cosmetici/donazioni. Elo, quote base e leghe mai in vendita. Motivo: la ladder muore il giorno che si compra.
+
+## ADR-010: soldi veri mai su potenza + reset stagionali con prestige — DECISO 22/09/2026, permanente
+Vendibili solo: cosmetici, comodità (replay oltre 12 mesi, leghe private, priorità code). MAI: Elo, budget/token/timeout/OBS/leghe/XP. Enforcement a codice (prodotti che toccano il sim rifiutati). Stagioni con reset Elo+XP e badge prestige permanente. Royalty env UGC: 5% tornei, 2% scommesse, autore escluso dalla propria ladder, solo match tra umani diversi, cap mensile. Env #2 ufficiale: corsa al totem.
 ## Storico domande chiuse
 1. ~~LLM provider~~ -> BYOK OpenRouter. 2. ~~Message~~ -> OFF in S0. 3. ~~Zip~~ -> 2MB stdlib+numpy.
 4. Nome `Botcraft`. 5. Build `sim` poi `viewer`. 6. Copiare/co-nostro + A/B/C -> ADR-007/008/009.
