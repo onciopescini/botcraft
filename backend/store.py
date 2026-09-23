@@ -81,7 +81,10 @@ def init():
                 "ALTER TABLE agents ADD COLUMN coins INTEGER NOT NULL DEFAULT 100",
                 "ALTER TABLE matches ADD COLUMN mode TEXT NOT NULL DEFAULT '1v1'",
                 "ALTER TABLE matches ADD COLUMN coach_a TEXT NOT NULL DEFAULT ''",
-                "ALTER TABLE matches ADD COLUMN coach_b TEXT NOT NULL DEFAULT ''"):
+                "ALTER TABLE matches ADD COLUMN coach_b TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE matches ADD COLUMN draft_a TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE matches ADD COLUMN draft_b TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE matches ADD COLUMN mutator TEXT NOT NULL DEFAULT ''"):
         try:
             con.execute(ddl)
         except Exception:
@@ -123,18 +126,24 @@ def leaderboard(mode: str = "1v1"):
 
 
 def enqueue(a: str, b: str, seed: int | None = None, mode: str = "1v1",
-            coach_a: dict | None = None, coach_b: dict | None = None):
+            coach_a: dict | None = None, coach_b: dict | None = None,
+            draft_a: dict | None = None, draft_b: dict | None = None,
+            mutator: str = ""):
     if a == b:
         raise ValueError("usa due nomi diversi (es. bot-greedy e bot-greedy2) anche se stesso preset")
     # 20% seed nascosti: seed alto random non comunicato prima (qui solo flag concettuale)
     if seed is None:
         seed = random.randrange(1_000_000)
     con = connect()
+    from sim.engine import MUTATORS
+    if mutator not in MUTATORS:
+        mutator = ""
     cur = con.execute(
-        "INSERT INTO matches(a,b,seed,status,mode,coach_a,coach_b,created) VALUES(?,?,?,?,?,?,?,?)",
+        "INSERT INTO matches(a,b,seed,status,mode,coach_a,coach_b,draft_a,draft_b,mutator,created) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
         (a, b, seed, "pending", mode,
          json.dumps(coach_a) if coach_a else "", json.dumps(coach_b) if coach_b else "",
-         time.time()))
+         json.dumps(draft_a) if draft_a else "", json.dumps(draft_b) if draft_b else "",
+         mutator, time.time()))
     mid = cur.lastrowid
     con.commit()
     con.close()

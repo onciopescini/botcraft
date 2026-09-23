@@ -27,7 +27,7 @@ def _seed_pool(n: int) -> list[int]:
     return [rnd.choice(pub) + i * 1000 for i in range(n)]
 
 
-def play_pair(a: str, b: str, seed: int, tag: str, best_of: int = 3):
+def play_pair(a: str, b: str, seed: int, tag: str, best_of: int = 3, mutator: str = ""):
     """Best-of-N anti-fortuna (Halite/CodeClash style): vince chi prende più mappe."""
     ag_a, ag_b = get_agent(a), get_agent(b)
     if not ag_a or not ag_b:
@@ -39,7 +39,7 @@ def play_pair(a: str, b: str, seed: int, tag: str, best_of: int = 3):
             break  # già deciso
         res, _ = run_match(load_decide(ag_a["preset"]), load_decide(ag_b["preset"]), seed + k * 7919,
                            out_path=str(ROOT / "matches" / f"{tag}-g{k}" / "replay.jsonl"),
-                           name_a=a, name_b=b)
+                           name_a=a, name_b=b, mutator=mutator)
         last = res
         if res["winner"] == 0:
             wa += 1
@@ -58,7 +58,8 @@ def play_pair(a: str, b: str, seed: int, tag: str, best_of: int = 3):
             "league_a": LEAGUE_OF(ag_a["preset"]), "league_b": LEAGUE_OF(ag_b["preset"])}
 
 
-def run_bracket(names: list[str], seeds: list[int] | None = None, title: str = "weekly"):
+def run_bracket(names: list[str], seeds: list[int] | None = None, title: str = "weekly",
+                mutator: str = ""):
     if len(names) != 8:
         raise ValueError("servono 8 nomi (anche con ripetizioni di preset diversi, ma nomi distinti)")
     seeds = seeds or _seed_pool(7)
@@ -67,21 +68,21 @@ def run_bracket(names: list[str], seeds: list[int] | None = None, title: str = "
     # quarti
     qf, winners_qf = [], []
     for i in range(0, 8, 2):
-        m = play_pair(names[i], names[i + 1], seeds[len(qf)], f"{base}-qf{i//2}")
+        m = play_pair(names[i], names[i + 1], seeds[len(qf)], f"{base}-qf{i//2}", mutator=mutator)
         qf.append(m)
         winners_qf.append(m["a"] if m["winner"] == 0 else m["b"])
     # semifinali
     sf, winners_sf = [], []
     for i in range(0, 4, 2):
-        m = play_pair(winners_qf[i], winners_qf[i + 1], seeds[4 + len(sf)], f"{base}-sf{i//2}")
+        m = play_pair(winners_qf[i], winners_qf[i + 1], seeds[4 + len(sf)], f"{base}-sf{i//2}", mutator=mutator)
         sf.append(m)
         winners_sf.append(m["a"] if m["winner"] == 0 else m["b"])
     # finale + 3 posto
     losers_sf = [m["b"] if m["winner"] == 0 else m["a"] for m in sf]
-    bronze = play_pair(losers_sf[0], losers_sf[1], seeds[6], f"{base}-bronze")
-    final = play_pair(winners_sf[0], winners_sf[1], seeds[5], f"{base}-final")
+    bronze = play_pair(losers_sf[0], losers_sf[1], seeds[6], f"{base}-bronze", mutator=mutator)
+    final = play_pair(winners_sf[0], winners_sf[1], seeds[5], f"{base}-final", mutator=mutator)
     champion = final["a"] if final["winner"] == 0 else final["b"]
-    report = {"v": 1, "title": title, "ts": ts, "champion": champion,
+    report = {"v": 1, "title": title, "ts": ts, "mutator": mutator, "champion": champion,
               "qf": qf, "sf": sf, "bronze": bronze, "final": final}
     out = ROOT / "matches" / base / "report.json"
     out.parent.mkdir(parents=True, exist_ok=True)

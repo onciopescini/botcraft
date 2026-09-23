@@ -43,7 +43,10 @@ def main():
         sys.exit(f"servono 8 nomi, trovati {len(names)}: completa con --names")
     from backend.tournaments import run_bracket
     from backend.caster import comment_tournament
-    rep = run_bracket(names, title=args.title)
+    import datetime
+    muts = ["", "gold_rush", "no_swords", "fast_gas"]
+    mut = muts[datetime.date.today().isocalendar()[1] % len(muts)]
+    rep = run_bracket(names, title=args.title, mutator=mut)
     c = comment_tournament(rep)
     d = ROOT / "matches" / f"tourney-{rep['ts']}"
     (d / "commentary.md").write_text(c)

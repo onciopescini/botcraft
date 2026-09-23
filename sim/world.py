@@ -17,6 +17,7 @@ TOTEM = (32, 32)
 def _mk(x, y):
     return {"x": x, "y": y, "hp": 100, "wood": 0, "stone": 0, "gold": 0,
             "sticks": 0, "has_sword": False, "walls_left": 5, "alive": True,
+            "dash_cd": 0, "shield": 0,
             "noop_streak": 0, "timeouts": 0, "illegal": 0, "kills": 0, "dead_at": -1}
 
 
@@ -121,6 +122,7 @@ def step_world(st, acts: dict) -> dict:
                     break
             if target:
                 k, f = target
+                dmg = _e.shielded_damage(f, dmg)
                 f["hp"] -= dmg
                 me["noop_streak"] = 0
                 _ev(st, n, f"hit {k} {dmg}")
@@ -140,9 +142,17 @@ def step_world(st, acts: dict) -> dict:
                 me["noop_streak"] += 1
         elif raw == "craft_stick":
             _e.craft(me, "stick", lambda m: None)
+        elif raw == "dash":
+            d = act.get("dir", "E") if isinstance(act, dict) else "E"
+            occ = {(a["x"], a["y"]) for k, a in st["agents"].items() if a["alive"] and k != n}
+            _e.do_dash(st, me, d, occ, lambda m: None)
+        elif raw == "shield":
+            _e.do_shield(me, lambda m: None)
     for a in st["agents"].values():
         if _e.bleed(a, lambda m: None) and a["dead_at"] < 0:
             a["dead_at"] = st["tick"]
+    for a in st["agents"].values():
+        _e.tick_timers(a)
     if st["tick"] >= MAX_TICKS:
         st["over"] = True
     return st

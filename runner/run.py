@@ -66,8 +66,10 @@ def safe_decide(fn, obs):
 
 def run_match(decide_a, decide_b, seed: int, out_path: str | None = None,
               name_a: str = "p1", name_b: str = "p2", max_ticks: int = 300,
-              coach_a: dict | list | None = None, coach_b: dict | list | None = None):
-    state = new_match(seed, max_ticks)
+              coach_a: dict | list | None = None, coach_b: dict | list | None = None,
+              draft_a: dict | None = None, draft_b: dict | None = None,
+              mutator: str = ""):
+    state = new_match(seed, max_ticks, draft_a, draft_b, mutator)
     mem_a_kb, ping_a = _bonus(name_a)
     mem_b_kb, ping_b = _bonus(name_b)
     for pid, cl in ((0, coach_a), (1, coach_b)):

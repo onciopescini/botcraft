@@ -10,5 +10,10 @@ Tesi: programmare-e-aspettare è un benchmark. Il gioco nasce da dramma + agency
 5. **Scommesse finte**: 100 coin ad agente, pari-mutuel sui pending, settle a fine match (`bets.html`). Lo spettatore ha qualcosa in palio.
 6. **Bounty leader +5**: uccidere chi è in testa paga extra. Rimonte premiate.
 
+## Arricchimenti (23/09)
+7. **Draft kit**: 10 punti pre-match (hp/spada/muri/risorse). Deckbuilding leggero, validazione server.
+8. **Mutatori settimanali**: gold_rush (20 gold), no_swords, fast_gas a rotazione nei tornei.
+9. **Dash** (scatto 2 celle, cooldown 5) e **scudo** (-8 danni 3 tick, 2 pietra precastato). Micro-decisioni tattiche.
+
 ## Anti-pattern evitati (Screeps)
 Debug lento (noi: blitz+demo istantanea), codice altrui nel client (viewer solo numeri), silenzio sui rischi (docs/05 + 15 espliciti).

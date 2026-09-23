@@ -17,6 +17,10 @@ RESPAWN_DELAY = 20
 TOTEM = (16, 16)
 GAS_DMG = 5
 BOUNTY = 5
+DRAFT_POINTS = 10
+DRAFT_COSTS = {"hp10": 3, "sword": 4, "walls2": 2, "wood2": 1, "stone2": 1, "gold1": 2}
+# mutatori settimanali (rotazione contenuti): gold_rush | no_swords | fast_gas | nessuno ""
+MUTATORS = ("", "gold_rush", "no_swords", "fast_gas")
 
 DIRS = {
     "N": (0, -1), "S": (0, 1), "E": (1, 0), "W": (-1, 0),
@@ -25,7 +29,7 @@ DIRS = {
 VALID_ACTIONS = {
     "move_N", "move_S", "move_E", "move_W",
     "gather", "craft_stick", "craft_sword", "craft_wall_kit",
-    "place_wall", "attack", "noop", "message",
+    "place_wall", "attack", "noop", "message", "dash", "shield",
 }
 
 MSG_ALLOWED = re.compile(r"[^a-zA-Z0-9 .,!?\-]")
@@ -185,14 +189,11 @@ def bleed(me, ev) -> bool:
 
 def gas_damage(st, me, ev) -> bool:
     """Ritorna True se muore. Gas su totem di stato (default TOTEM)."""
-    mt = st.get("max_ticks", MAX_TICKS)
-    start = mt * 5 // 6
-    if st["tick"] < start:
+    if gas_radius_mt(st["tick"], st.get("max_ticks", MAX_TICKS), gas_start_frac(st)) >= 99.0:
         return False
-    f = (st["tick"] - start) / max(1, mt - start)
-    r = 22.0 - 19.0 * f
     totem = tuple(st.get("totem", TOTEM))
-    if me["alive"] and manhattan((me["x"], me["y"]), totem) > r:
+    if me["alive"] and manhattan((me["x"], me["y"]), totem) > gas_radius_mt(
+            st["tick"], st.get("max_ticks", MAX_TICKS), gas_start_frac(st)):
         me["hp"] -= GAS_DMG
         ev("gas -5")
         if me["hp"] <= 0:
@@ -202,8 +203,104 @@ def gas_damage(st, me, ev) -> bool:
     return False
 
 
-def gas_radius_mt(tick: int, max_ticks: int) -> float:
-    start = max_ticks * 5 // 6
+def tick_timers(me):
+    if me.get("dash_cd", 0) > 0:
+        me["dash_cd"] -= 1
+    if me.get("shield", 0) > 0:
+        me["shield"] -= 1
+
+
+def do_dash(st, me, d: str, others: set, ev) -> bool:
+    """Scatto di 2 celle (cooldown 5). Ritorna True se mosso."""
+    if me.get("dash_cd", 0) > 0 or d not in DIRS:
+        me["noop_streak"] += 1
+        ev("dash_fail")
+        return False
+    dx, dy = DIRS[d]
+    cells = [(me["x"] + dx, me["y"] + dy), (me["x"] + 2 * dx, me["y"] + 2 * dy)]
+    w, h = st.get("w", W), st.get("h", H)
+    for nx, ny in cells:
+        if not (0 <= nx < w and 0 <= ny < h) or wall_at(st, nx, ny) or (nx, ny) in st["trees"] \
+                or (nx, ny) in st["rocks"] or (nx, ny) in st["golds"] \
+                or (nx, ny) == tuple(st.get("totem", TOTEM)) or (nx, ny) in others:
+            me["noop_streak"] += 1
+            ev("dash_fail")
+            return False
+    me["x"], me["y"] = cells[1]
+    me["dash_cd"] = 5
+    me["noop_streak"] = 0
+    ev("dash_ok")
+    return True
+
+
+def do_shield(me, ev) -> bool:
+    """Scudo 3 tick (-8 danni), costa 2 pietra."""
+    if me.get("shield", 0) > 0 or me["stone"] < 2:
+        me["noop_streak"] += 1
+        ev("shield_fail")
+        return False
+    me["stone"] -= 2
+    me["shield"] = 3
+    me["noop_streak"] = 0
+    ev("shield_ok")
+    return True
+
+
+def shielded_damage(me, dmg: int) -> int:
+    if me.get("shield", 0) > 0:
+        return max(0, dmg - 8)
+    return dmg
+
+
+def gas_start_frac(st) -> float:
+    return 3 / 6 if st.get("mutator") == "fast_gas" else 5 / 6
+
+
+def gas_radius_mt(tick: int, max_ticks: int, frac: float = 5 / 6) -> float:
+    start = max_ticks * frac
     if tick < start:
         return 99.0
     return 22.0 - 19.0 * ((tick - start) / max(1, max_ticks - start))
+
+
+def validate_draft(picks: dict | None) -> dict:
+    """Draft kit: 10 punti. Ritorna loadout normalizzato (mai oltre cap)."""
+    picks = picks or {}
+    def n(k):
+        try:
+            return max(0, int(picks.get(k, 0)))
+        except Exception:
+            return 0
+    hp10 = min(3, n("hp10"))
+    sword = 1 if picks.get("sword") else 0
+    walls2 = min(3, n("walls2"))
+    wood2 = min(5, n("wood2"))
+    stone2 = min(5, n("stone2"))
+    gold1 = min(3, n("gold1"))
+    cost = (hp10 * DRAFT_COSTS["hp10"] + sword * DRAFT_COSTS["sword"]
+            + walls2 * DRAFT_COSTS["walls2"] + wood2 * DRAFT_COSTS["wood2"]
+            + stone2 * DRAFT_COSTS["stone2"] + gold1 * DRAFT_COSTS["gold1"])
+    # scala tutto se oltre budget (priorità nell'ordine scritto)
+    while cost > DRAFT_POINTS and (hp10 + walls2 + wood2 + stone2 + gold1) > 0:
+        for k in ("gold1", "wood2", "stone2", "walls2", "hp10"):
+            if k == "gold1" and gold1:
+                gold1 -= 1
+                break
+            if k == "wood2" and wood2:
+                wood2 -= 1
+                break
+            if k == "stone2" and stone2:
+                stone2 -= 1
+                break
+            if k == "walls2" and walls2:
+                walls2 -= 1
+                break
+            if k == "hp10" and hp10:
+                hp10 -= 1
+                break
+        cost = (hp10 * DRAFT_COSTS["hp10"] + sword * DRAFT_COSTS["sword"]
+                + walls2 * DRAFT_COSTS["walls2"] + wood2 * DRAFT_COSTS["wood2"]
+                + stone2 * DRAFT_COSTS["stone2"] + gold1 * DRAFT_COSTS["gold1"])
+    return {"hp": 100 + hp10 * 10, "sword": bool(sword),
+            "walls": 5 + walls2 * 2, "wood": wood2 * 2,
+            "stone": stone2 * 2, "gold": gold1}

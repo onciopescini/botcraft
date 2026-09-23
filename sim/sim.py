@@ -23,10 +23,22 @@ _manhattan = _e.manhattan
 clean_message = _e.clean_message
 _wall_at = _e.wall_at
 _blocked = _e.blocked
-gas_radius = lambda state: _e.gas_radius_mt(state["tick"], state["max_ticks"])
+gas_radius = lambda state: _e.gas_radius_mt(state["tick"], state["max_ticks"], _e.gas_start_frac(state))
 
 
-def new_match(seed: int, max_ticks: int = MAX_TICKS) -> dict:
+def _mk_agent(spawn, loadout: dict | None):
+    lo = _e.validate_draft(loadout)
+    return {"x": spawn[0], "y": spawn[1], "hp": lo["hp"], "wood": lo["wood"],
+            "stone": lo["stone"], "gold": lo["gold"], "sticks": 0,
+            "has_sword": lo["sword"], "walls_left": lo["walls"], "bounty": 0,
+            "dash_cd": 0, "shield": 0,
+            "alive": True, "noop_streak": 0, "timeouts": 0, "illegal": 0, "kills": 0,
+            "draft": lo}
+
+
+def new_match(seed: int, max_ticks: int = MAX_TICKS,
+              loadout_a: dict | None = None, loadout_b: dict | None = None,
+              mutator: str = "") -> dict:
     rng = random.Random(seed)
     # spawn flip deterministico
     spawns = [(2, 2), (29, 29)]
@@ -50,19 +62,20 @@ def new_match(seed: int, max_ticks: int = MAX_TICKS) -> dict:
         if p not in occupied:
             occupied.add(p)
             golds.append(p)
+    mutator = mutator if mutator in _e.MUTATORS else ""
+    if mutator == "gold_rush":
+        while len(golds) < 20:
+            p = (rng.randrange(W), rng.randrange(H))
+            if p not in occupied:
+                occupied.add(p)
+                golds.append(p)
     state = {
         "seed": seed,
         "tick": 0,
         "max_ticks": max(20, max_ticks),
+        "mutator": mutator,
         "respawn_counter": 0,
-        "agents": [
-            {"x": spawns[0][0], "y": spawns[0][1], "hp": 100, "wood": 0, "stone": 0, "gold": 0,
-             "sticks": 0, "has_sword": False, "walls_left": 5, "bounty": 0,
-             "alive": True, "noop_streak": 0, "timeouts": 0, "illegal": 0, "kills": 0},
-            {"x": spawns[1][0], "y": spawns[1][1], "hp": 100, "wood": 0, "stone": 0, "gold": 0,
-             "sticks": 0, "has_sword": False, "walls_left": 5, "bounty": 0,
-             "alive": True, "noop_streak": 0, "timeouts": 0, "illegal": 0, "kills": 0},
-        ],
+        "agents": [_mk_agent(spawns[0], loadout_a), _mk_agent(spawns[1], loadout_b)],
         "trees": trees,
         "rocks": rocks,
         "golds": golds,
@@ -74,6 +87,9 @@ def new_match(seed: int, max_ticks: int = MAX_TICKS) -> dict:
         "events": [[], []],
         "over": False,
     }
+    if mutator == "no_swords":
+        for a in state["agents"]:
+            a["has_sword"] = False
     return state
 
 
@@ -91,16 +107,6 @@ def set_coach(state: dict, pid: int, tick: int, x: int, y: int):
 def coach_now(state: dict, pid: int):
     due = [c for c in state["coach"][pid] if state["tick"] >= c["tick"]]
     return due[-1] if due else None
-
-
-def gas_radius(state: dict) -> float:
-    """Sudden death: ultimi 1/6 di match, raggio 22 -> 3 sul totem."""
-    mt = state["max_ticks"]
-    start = mt * 5 // 6
-    if state["tick"] < start:
-        return 99.0
-    f = (state["tick"] - start) / max(1, mt - start)
-    return 22.0 - 19.0 * f
 
 
 def _free_cell(state, rng):
@@ -184,6 +190,10 @@ def _apply(state, pid, action: dict):
         return
 
     if raw == "craft_sword":
+        if state.get("mutator") == "no_swords":
+            _push_event(state, pid, "craft_fail no_swords_week")
+            me["noop_streak"] += 1
+            return
         _e.craft(me, "sword", lambda m: _push_event(state, pid, m))
         return
 
@@ -209,9 +219,25 @@ def _apply(state, pid, action: dict):
             _push_event(state, pid, f"wall_fail {r}")
         return
 
+    if raw == "dash":
+        d = action.get("dir", "E") if isinstance(action, dict) else "E"
+        if d not in DIRS:
+            me["illegal"] += 1
+            me["noop_streak"] += 1
+            _push_event(state, pid, f"illegal:dir_{d}")
+            return
+        other_pos = (foe["x"], foe["y"]) if foe["alive"] else None
+        others = {other_pos} if other_pos else set()
+        _e.do_dash(state, me, d, others, lambda m: _push_event(state, pid, m))
+        return
+
+    if raw == "shield":
+        _e.do_shield(me, lambda m: _push_event(state, pid, m))
+        return
+
     if raw == "attack":
         if foe["alive"] and _manhattan((me["x"], me["y"]), (foe["x"], foe["y"])) == 1:
-            dmg = 20 if me["has_sword"] else 10
+            dmg = _e.shielded_damage(foe, 20 if me["has_sword"] else 10)
             foe["hp"] -= dmg
             me["noop_streak"] = 0
             _push_event(state, pid, f"hit_dealt {dmg}")
@@ -251,6 +277,8 @@ def step(state: dict, a1: dict, a2: dict) -> dict:
         _e.bleed(state["agents"][pid], lambda m, p=pid: _push_event(state, p, m))
     for pid in (0, 1):
         _e.gas_damage(state, state["agents"][pid], lambda m, p=pid: _push_event(state, p, m))
+    for pid in (0, 1):
+        _e.tick_timers(state["agents"][pid])
     if state["tick"] >= state["max_ticks"] or not (state["agents"][0]["alive"] or state["agents"][1]["alive"]):
         state["over"] = True
     return state
@@ -281,7 +309,9 @@ def to_obs(state: dict, pid: int) -> dict:
         "seed": state["seed"],
         "self": {"x": me["x"], "y": me["y"], "hp": me["hp"], "wood": me["wood"],
                  "stone": me["stone"], "gold": me.get("gold", 0), "has_sword": me["has_sword"],
-                 "walls_left": me["walls_left"]},
+                 "walls_left": me["walls_left"], "dash_cd": me.get("dash_cd", 0),
+                 "shield": me.get("shield", 0)},
+        "mutator": state.get("mutator", ""),
         "enemy": {"visible": visible,
                   "x": foe["x"] if visible else -1,
                   "y": foe["y"] if visible else -1,
@@ -323,10 +353,11 @@ def result(state: dict) -> dict:
 
 
 def state_hash(state: dict) -> str:
+    agents = [{k: v for k, v in a.items() if k != "draft"} for a in state["agents"]]
     payload = json.dumps({
         "tick": state["tick"],
         "max_ticks": state["max_ticks"],
-        "agents": state["agents"],
+        "agents": agents,
         "trees": sorted(state["trees"]),
         "rocks": sorted(state["rocks"]),
         "golds": sorted(state.get("golds", [])),

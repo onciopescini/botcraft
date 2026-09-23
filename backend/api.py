@@ -74,6 +74,9 @@ class MatchIn(BaseModel):
     mode: str = "1v1"  # 1v1|blitz|squad
     coach_a: dict | None = None  # {"tick":t,"x":x,"y":y} 1 ping coach
     coach_b: dict | None = None
+    draft_a: dict | None = None  # {"hp10":n,"sword":bool,"walls2":n,"wood2":n,"stone2":n,"gold1":n} max 10pt
+    draft_b: dict | None = None
+    mutator: str = ""  # gold_rush|no_swords|fast_gas (rotazione settimanale)
 
 
 @app.post("/agents")
@@ -109,7 +112,8 @@ def post_match(inp: MatchIn, req: Request):
     if not ok:
         raise HTTPException(429, f"quota giornaliera {league} esaurita (monetizzabile: alza il piano)")
     mode = inp.mode if inp.mode in ("1v1", "blitz", "squad") else "1v1"
-    mid = enqueue(inp.a, inp.b, inp.seed, mode, inp.coach_a, inp.coach_b)
+    mid = enqueue(inp.a, inp.b, inp.seed, mode, inp.coach_a, inp.coach_b, inp.draft_a, inp.draft_b,
+                  inp.mutator if inp.mutator in ("gold_rush", "no_swords", "fast_gas") else "")
     record_use(tok)
     return {"id": mid, "status": "pending", "league": league, "mode": mode, "quota_left": left - 1,
             "hint": "avvia backend/worker.py per giocarlo"}

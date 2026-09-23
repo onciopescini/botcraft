@@ -51,9 +51,18 @@ def run_once() -> dict | None:
             cb = _j.loads(m.get("coach_b") or "null")
         except Exception:
             cb = None
+        try:
+            da = _j.loads(m.get("draft_a") or "null")
+        except Exception:
+            da = None
+        try:
+            db = _j.loads(m.get("draft_b") or "null")
+        except Exception:
+            db = None
         res, _ = run_match(decide_a, decide_b, m["seed"], out_path=str(out),
                            name_a=m["a"], name_b=m["b"], max_ticks=mt,
-                           coach_a=ca, coach_b=cb)
+                           coach_a=ca, coach_b=cb, draft_a=da, draft_b=db,
+                           mutator=m.get("mutator") or "")
     finish_match(m["id"], res["winner"], res["s0"], res["s1"], res["hash"])
     return {"id": m["id"], **res}
 

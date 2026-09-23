@@ -14,6 +14,7 @@ VALID_ACTIONS = base.VALID_ACTIONS
 def _mk(x, y):
     return {"x": x, "y": y, "hp": 100, "wood": 0, "stone": 0, "gold": 0,
             "sticks": 0, "has_sword": False, "walls_left": 5,
+            "dash_cd": 0, "shield": 0,
             "alive": True, "noop_streak": 0, "timeouts": 0, "illegal": 0, "kills": 0}
 
 
@@ -97,7 +98,7 @@ def _apply_unit(st, idx, action):
         for f in foes:
             foe = st["units"][f]
             if foe["alive"] and base._manhattan((me["x"], me["y"]), (foe["x"], foe["y"])) == 1:
-                dmg = 20 if me["has_sword"] else 10
+                dmg = _e.shielded_damage(foe, 20 if me["has_sword"] else 10)
                 foe["hp"] -= dmg
                 me["noop_streak"] = 0
                 base._push_event(st, idx, f"hit_dealt {dmg}")
@@ -107,6 +108,20 @@ def _apply_unit(st, idx, action):
                     me["kills"] += 1
                     base._push_event(st, idx, "kill")
                 return
+        base._push_event(st, idx, "attack_miss")
+        me["noop_streak"] += 1
+        return
+    if raw == "dash":
+        d = action.get("dir", "E") if isinstance(action, dict) else "E"
+        if d not in base.DIRS:
+            me["noop_streak"] += 1
+            return
+        dx, dy = base.DIRS[d]
+        _e.do_dash(st, me, d, _alive_pos(st, idx), lambda m: base._push_event(st, idx, m))
+        return
+    if raw == "shield":
+        _e.do_shield(me, lambda m: base._push_event(st, idx, m) if m.startswith("shield_o") else None)
+        return
         base._push_event(st, idx, "attack_miss")
         me["noop_streak"] += 1
         return
@@ -138,6 +153,8 @@ def step_squad(st, acts: list) -> dict:
         st["over"] = True
     for u in st["units"]:
         _e.bleed(u, lambda m: None)  # squad: bleed silenzioso
+    for u in st["units"]:
+        _e.tick_timers(u)
     # sudden death condivisa (silenziosa)
     _probe = {"tick": st["tick"], "max_ticks": 300}
     for u in st["units"]:
