@@ -4,6 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Botcraft — replay 3D</title>
+<link rel="icon" href="../assets/favicon.svg"/>
 <link rel="stylesheet" href="../design.css"/>
 <style>
   :root { --panel:#141a26f2; --line:#3a4c72; --blu:#4da3ff; --oro:#ffd700; }
@@ -42,6 +43,17 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="endcard" style="display:none;position:fixed;inset:0;background:rgba(5,8,13,.72);z-index:20;align-items:center;justify-content:center;">
+  <div class="card" style="max-width:380px;text-align:center;background:var(--panel);">
+    <h2 id="end-title" style="margin:0 0 6px;">Fine match</h2>
+    <p id="end-score" style="font-size:15px;"></p>
+    <div class="row" style="justify-content:center;">
+      <button id="end-again" class="go" style="background:var(--oro);color:#141414;border:0;">riguarda</button>
+      <button id="end-copy">copia testo</button>
+      <button id="end-close">chiudi</button>
+    </div>
+  </div>
+</div>
 <div id="ui">
   <h1>Botcraft — replay 3D<small id="src">nessun replay caricato</small></h1>
   <nav><a href="./leaderboard.html">ladder</a><a href="./tournament.html">tornei</a><a href="../">home</a></nav>

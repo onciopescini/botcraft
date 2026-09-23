@@ -8,6 +8,9 @@ import { burst, tickParts, blip, setAudio, koFX, setSlowmo, setShake, slowmoUnti
 
 applySettings();
 setAudio(!!SET.audio);
+if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  SET.shake = false; SET.slow = false; applySettings(); // sessione, non salvato
+}
 
 applySettings();
 
@@ -26,6 +29,7 @@ const elPlay = document.getElementById('play');
 function parseReplay(text, name) {
   frames = text.trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
   tFloat = 0;
+  window.__endShown = false;
   setPrevHp(null);
   window.__prevHp = null;
   setSlowmo(0); setShake(0);
@@ -204,14 +208,55 @@ function drawGraph() {
 
 let last = performance.now();
 let camMode = 'orbit';
+let endInfo = null;
+async function showEnd() {
+  const lastF = frames[frames.length - 1];
+  const qp = new URLSearchParams(location.search);
+  const n1 = qp.get('p1') || 'Blu', n2 = qp.get('p2') || 'Rosso';
+  let s0 = lastF.p1.wood + lastF.p1.stone + (lastF.p1.gold || 0) * 3;
+  let s1 = lastF.p2.wood + lastF.p2.stone + (lastF.p2.gold || 0) * 3;
+  let exact = false;
+  const q = qp.get('match');
+  for (const u of [`../matches/${q}/replay.jsonl.result.json`, `/replays/${q}/replay.jsonl.result.json`,
+                   `https://botcraft-6tjh.onrender.com/replays/${q}/replay.jsonl.result.json`]) {
+    try {
+      const r = await fetch(u);
+      if (r.ok) { const j = await r.json(); s0 = j.s0; s1 = j.s1; exact = true; break; }
+    } catch {}
+  }
+  const w = s0 === s1 ? null : (s0 > s1 ? n1 : n2);
+  endInfo = { n1, n2, s0, s1, w };
+  document.getElementById('end-title').textContent = w ? `${w} vince!` : 'Pareggio!';
+  document.getElementById('end-score').textContent =
+    `🔵 ${n1} ${s0} — ${s1} ${n2} 🔴${exact ? '' : ' (stima)'}`;
+  document.getElementById('endcard').style.display = 'flex';
+  feed(`fine: <b>${w || 'pareggio'}</b> ${s0}-${s1}`);
+}
+document.getElementById('end-again').addEventListener('click', () => {
+  document.getElementById('endcard').style.display = 'none';
+  window.__endShown = false;
+  tFloat = 0;
+});
+document.getElementById('end-close').addEventListener('click', () => {
+  document.getElementById('endcard').style.display = 'none';
+});
+document.getElementById('end-copy').addEventListener('click', (e) => {
+  if (!endInfo) return;
+  navigator.clipboard.writeText(
+    `🔵 ${endInfo.n1} ${endInfo.s0} — ${endInfo.s1} ${endInfo.n2} 🔴 — visto su Botcraft ${location.href} #Botcraft`);
+  e.target.textContent = 'copiato!';
+  setTimeout(() => e.target.textContent = 'copia testo', 1500);
+});
+async function showEnd() {
 function loop(now) {
   requestAnimationFrame(loop);
   const dt = (now - last) / 1000;
   last = now;
   if (frames.length && playing) {
     const eff = (SET.slow && performance.now() < slowmoUntil) ? 0.25 : 1;
+    const before = tFloat;
     tFloat += dt * 2 * speed * eff;
-    if (tFloat >= frames.length - 1) tFloat = 0;
+    if (tFloat >= frames.length - 1) { tFloat = 0; if (before > 1 && !window.__endShown) { window.__endShown = true; showEnd(); } }
     elTick.value = Math.floor(tFloat);
     const tag = (SET.slow && performance.now() < slowmoUntil) ? ' (slow-mo KO!)' : '';
     elLabel.textContent = `tick ${Math.floor(tFloat)}/${frames.length - 1}${tag}`;

@@ -43,3 +43,7 @@ footer.site a { margin: 0 8px; }
 .skel td { color: transparent !important; background: linear-gradient(90deg,#1a2338,#24314d,#1a2338);
   background-size: 200% 100%; animation: sh 1.2s infinite; border-radius: 6px; }
 @keyframes sh { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .skel td { animation: none; }
+  * { transition: none !important; }
+}
