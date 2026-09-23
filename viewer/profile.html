@@ -56,7 +56,7 @@ async function load() {
     (p.packs || []).map(b => `<span class="badge gold">pack:${b}</span>`).join('');
   const pr = p.progress || { xp: 0, level: 0, mem_kb: 10, pings: 1 };
   const toNext = 100 - (pr.xp % 100);
-  $('stats').innerHTML = `preset ${p.preset} · 1v1 Elo ${Math.round(p.elo)} (${p.games}) · blitz ${Math.round(p.elo_blitz || 1200)} · squad ${Math.round(p.elo_squad)} · coin ${p.coins}<br/>` +
+  $('stats').innerHTML = `preset ${p.preset} · 1v1 Elo ${Math.round(p.elo)} (${p.games}) · blitz ${Math.round(p.elo_blitz || 1200)} · race ${Math.round(p.elo_race || 1200)} · squad ${Math.round(p.elo_squad)} · coin ${p.coins}<br/>` +
     `livello ${pr.level} · ${pr.xp} XP (mancano ${toNext}) · memoria ${pr.mem_kb}KB · ping ${pr.pings}<br/>` +
     `<span style="display:inline-block;width:180px;background:#1a2338;border-radius:6px;height:8px;overflow:hidden;"><span style="display:block;height:100%;width:${100 - toNext}%;background:#ffd700;"></span></span>`;
   $('recent').innerHTML = '<tr><th>id</th><th>match</th><th>score</th><th>replay</th></tr>' + p.recent.map(m =>

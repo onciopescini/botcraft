@@ -74,9 +74,12 @@ def init():
                 "ALTER TABLE agents ADD COLUMN games_squad INTEGER NOT NULL DEFAULT 0",
                 "ALTER TABLE agents ADD COLUMN elo_blitz REAL NOT NULL DEFAULT 1200",
                 "ALTER TABLE agents ADD COLUMN games_blitz INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE agents ADD COLUMN elo_race REAL NOT NULL DEFAULT 1200",
+                "ALTER TABLE agents ADD COLUMN games_race INTEGER NOT NULL DEFAULT 0",
                 "ALTER TABLE agents ADD COLUMN rd REAL NOT NULL DEFAULT 350",
                 "ALTER TABLE agents ADD COLUMN rd_squad REAL NOT NULL DEFAULT 350",
                 "ALTER TABLE agents ADD COLUMN rd_blitz REAL NOT NULL DEFAULT 350",
+                "ALTER TABLE agents ADD COLUMN rd_race REAL NOT NULL DEFAULT 350",
                 "ALTER TABLE agents ADD COLUMN last_game REAL NOT NULL DEFAULT 0",
                 "ALTER TABLE agents ADD COLUMN coins INTEGER NOT NULL DEFAULT 100",
                 "ALTER TABLE matches ADD COLUMN mode TEXT NOT NULL DEFAULT '1v1'",
@@ -94,7 +97,7 @@ def init():
 
 
 def register_agent(name: str, preset: str):
-    assert preset in ("random", "greedy", "llm-greedy", "squad", "jev-greedy", "bt"), "preset: random|greedy|llm-greedy|squad|jev-greedy|bt"
+    assert preset in ("random", "greedy", "llm-greedy", "squad", "jev-greedy", "bt", "racer"), "preset: ...+racer"
     con = connect()
     try:
         con.execute("INSERT INTO agents(name,preset) VALUES(?,?)", (name, preset))
@@ -119,6 +122,8 @@ def leaderboard(mode: str = "1v1"):
         rows = con.execute("SELECT name,preset,elo_squad AS elo,games_squad AS games,rd_squad AS rd FROM agents ORDER BY elo_squad DESC").fetchall()
     elif mode == "blitz":
         rows = con.execute("SELECT name,preset,elo_blitz AS elo,games_blitz AS games,rd_blitz AS rd FROM agents ORDER BY elo_blitz DESC").fetchall()
+    elif mode == "race":
+        rows = con.execute("SELECT name,preset,elo_race AS elo,games_race AS games,rd_race AS rd FROM agents ORDER BY elo_race DESC").fetchall()
     else:
         rows = con.execute("SELECT name,preset,elo,games,rd FROM agents ORDER BY elo DESC").fetchall()
     con.close()
@@ -181,8 +186,11 @@ def finish_match(mid: int, winner: int, s0: int, s1: int, h: str):
         return
     squad = (m["mode"] == "squad")
     blitz = (m["mode"] == "blitz")
-    ecol, gcol = ("elo_squad", "games_squad") if squad else (("elo_blitz", "games_blitz") if blitz else ("elo", "games"))
-    rdcol = "rd_squad" if squad else ("rd_blitz" if blitz else "rd")
+    race = (m["mode"] == "race")
+    ecol, gcol = (("elo_squad", "games_squad") if squad else
+                  (("elo_race", "games_race") if race else
+                   (("elo_blitz", "games_blitz") if blitz else ("elo", "games"))))
+    rdcol = ("rd_squad" if squad else ("rd_race" if race else ("rd_blitz" if blitz else "rd")))
     import time as _t
     now = _t.time()
     # Elo + Glicko-RD: RD cresce con l'inattività (max 350), cala giocando (min 30).
@@ -306,7 +314,7 @@ def pending_count() -> int:
     return row["c"]
 
 
-XP_BASE = {"blitz": 10, "1v1": 20, "squad": 30, "daily": 15, "world": 30, "tourney": 20}
+XP_BASE = {"blitz": 10, "1v1": 20, "squad": 30, "daily": 15, "world": 30, "tourney": 20, "race": 15}
 
 
 def level_of(xp: int) -> int:

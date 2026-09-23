@@ -37,7 +37,11 @@ def run_once() -> dict | None:
         print(f"BOXER_URL settato ({BOXER_URL}): in prod qui si POSTa lo zip a Boxer invece di import locale. Fallback locale per S2.")
     import json as _j
     out = ROOT / "matches" / f"ladder-{m['id']}" / "replay.jsonl"
-    if m.get("mode") == "squad":
+    if m.get("mode") == "race":
+        from runner.run_race import run_race
+        res, _ = run_race(decide_a, decide_b, m["seed"], out_path=str(out),
+                          name_a=m["a"], name_b=m["b"])
+    elif m.get("mode") == "squad":
         from runner.run_squad import run_squad_match
         res, _ = run_squad_match(decide_a, decide_b, m["seed"], out_path=str(out),
                                  name_a=m["a"], name_b=m["b"])

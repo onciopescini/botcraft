@@ -15,5 +15,8 @@ Tesi: programmare-e-aspettare è un benchmark. Il gioco nasce da dramma + agency
 8. **Mutatori settimanali**: gold_rush (20 gold), no_swords, fast_gas a rotazione nei tornei.
 9. **Dash** (scatto 2 celle, cooldown 5) e **scudo** (-8 danni 3 tick, 2 pietra precastato). Micro-decisioni tattiche.
 
+## Env #2: corsa (23/09)
+Primo adiacente al totem vince (150 tick). Kill senza punti, respawn dopo 10 tick, muri per sabotare, gold tiebreak. Elo race separato. Greedy classico perde sempre (campera fino al 250): servono bot che corrono davvero.
+
 ## Anti-pattern evitati (Screeps)
 Debug lento (noi: blitz+demo istantanea), codice altrui nel client (viewer solo numeri), silenzio sui rischi (docs/05 + 15 espliciti).

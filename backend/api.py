@@ -64,7 +64,7 @@ def root():
 
 class AgentIn(BaseModel):
     name: str
-    preset: str  # random|greedy|llm-greedy|jev-greedy|squad|bt in S2
+    preset: str  # random|greedy|llm-greedy|jev-greedy|squad|bt|racer in S2
 
 
 class MatchIn(BaseModel):
@@ -82,8 +82,8 @@ class MatchIn(BaseModel):
 @app.post("/agents")
 def post_agent(inp: AgentIn, req: Request):
     tok = require_token(req)
-    if inp.preset not in ("random", "greedy", "llm-greedy", "jev-greedy", "squad", "bt", "squad"):
-        return {"error": "preset deve essere random|greedy|llm-greedy|jev-greedy|squad|bt"}
+    if inp.preset not in ("random", "greedy", "llm-greedy", "jev-greedy", "squad", "bt", "racer", "squad"):
+        return {"error": "preset deve essere random|greedy|llm-greedy|jev-greedy|squad|bt|racer"}
     ag = register_agent(inp.name.strip(), inp.preset)
     ag = register_agent(inp.name.strip(), inp.preset)
     record_use(tok)
@@ -92,7 +92,7 @@ def post_agent(inp: AgentIn, req: Request):
 
 @app.get("/leaderboard")
 def get_lb(league: str | None = None, mode: str = "1v1"):
-    lb = leaderboard(mode if mode in ("1v1", "squad") else "1v1")
+    lb = leaderboard(mode if mode in ("1v1", "blitz", "squad", "race") else "1v1")
     if league in ("code-only", "open"):
         want = "code-only" if league == "code-only" else "open"
         lb = [r for r in lb if ("open" if r["preset"] in ("llm-greedy", "jev-greedy", "custom") else "code-only") == want]
@@ -111,7 +111,7 @@ def post_match(inp: MatchIn, req: Request):
     ok, left = check_quota(tok, league)
     if not ok:
         raise HTTPException(429, f"quota giornaliera {league} esaurita (monetizzabile: alza il piano)")
-    mode = inp.mode if inp.mode in ("1v1", "blitz", "squad") else "1v1"
+    mode = inp.mode if inp.mode in ("1v1", "blitz", "squad", "race") else "1v1"
     mid = enqueue(inp.a, inp.b, inp.seed, mode, inp.coach_a, inp.coach_b, inp.draft_a, inp.draft_b,
                   inp.mutator if inp.mutator in ("gold_rush", "no_swords", "fast_gas") else "")
     record_use(tok)
@@ -256,6 +256,7 @@ def agent_profile(name: str):
     return {**{k: ag[k] for k in ("name", "preset", "elo", "games") if k in ag},
             "elo_squad": ag.get("elo_squad", 1200), "games_squad": ag.get("games_squad", 0),
             "elo_blitz": ag.get("elo_blitz", 1200), "games_blitz": ag.get("games_blitz", 0),
+            "elo_race": ag.get("elo_race", 1200), "games_race": ag.get("games_race", 0),
             "coins": ag.get("coins", 100), "progress": get_progress(name),
             "packs": owned_packs(name),
             "badges": badges, "recent": recent,
