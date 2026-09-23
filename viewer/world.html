@@ -89,10 +89,17 @@ function draw() {
   const ox = cv.width / 2 - cam.x * S, oy = cv.height / 2 - cam.y * S;
   const X = x => ox + x * S, Y = y => oy + y * S;
   g.fillStyle = '#0b0e14'; g.fillRect(0, 0, cv.width, cv.height);
-  // quadranti territorio
-  g.fillStyle = '#101623';
-  g.fillRect(X(0), Y(0), W / 2 * S, H / 2 * S);
-  g.fillRect(X(W / 2), Y(H / 2), W / 2 * S, H / 2 * S);
+  // biomi stagione (E4): ogni quadrante ha il suo fondo
+  const BI = { foresta: '#0e2417', deserto: '#2a2113', ghiaccio: '#12202e', vulcano: '#260f0f' };
+  const BQ = (meta && meta.biomes) || {};
+  const quads = [['NW', 0, 0], ['NE', W / 2, 0], ['SW', 0, H / 2], ['SE', W / 2, H / 2]];
+  for (const [q, qx, qy] of quads) {
+    g.fillStyle = BI[BQ[q]] || '#101623';
+    g.fillRect(X(qx), Y(qy), W / 2 * S, H / 2 * S);
+    g.fillStyle = '#9aa7bd';
+    g.font = '11px system-ui';
+    g.fillText(BQ[q] || '', X(qx) + 6, Y(qy) + 16);
+  }
   g.strokeStyle = '#24314d';
   g.strokeRect(X(0), Y(0), W * S, H * S);
   g.beginPath(); g.moveTo(X(W / 2), Y(0)); g.lineTo(X(W / 2), Y(H)); g.moveTo(X(0), Y(H / 2)); g.lineTo(X(W), Y(H / 2)); g.stroke();

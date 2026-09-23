@@ -67,6 +67,11 @@ def run_season(decides: dict[str, object], seed: int, title: str = "season",
             if st["over"]:
                 break
     standings = sorted(((n, score_world(st, n)) for n in names), key=lambda kv: -kv[1])
+    import random as _r
+    _biomes = ["foresta", "deserto", "ghiaccio", "vulcano"]
+    _rr = _r.Random(seed)
+    _rr.shuffle(_biomes)
+    biomes = dict(zip(["NW", "NE", "SW", "SE"], _biomes))
     try:
         from backend.store import connect, XP_BASE
         con = connect()
@@ -80,7 +85,7 @@ def run_season(decides: dict[str, object], seed: int, title: str = "season",
     except Exception:
         pass
     report = {"v": 1, "mode": "world", "title": title, "seed": seed,
-              "tick": st["tick"], "hash": world_hash(st),
+              "tick": st["tick"], "hash": world_hash(st), "biomes": biomes,
               "standings": [{"name": n, "score": s} for n, s in standings],
               "champion": standings[0][0], "territory": territory(st)}
     if snap_dir:
