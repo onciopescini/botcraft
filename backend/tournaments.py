@@ -27,22 +27,34 @@ def _seed_pool(n: int) -> list[int]:
     return [rnd.choice(pub) + i * 1000 for i in range(n)]
 
 
-def play_pair(a: str, b: str, seed: int, tag: str):
+def play_pair(a: str, b: str, seed: int, tag: str, best_of: int = 3):
+    """Best-of-N anti-fortuna (Halite/CodeClash style): vince chi prende più mappe."""
     ag_a, ag_b = get_agent(a), get_agent(b)
     if not ag_a or not ag_b:
         raise ValueError(f"agente mancante: {a} vs {b}")
-    res, _ = run_match(load_decide(ag_a["preset"]), load_decide(ag_b["preset"]), seed,
-                       out_path=str(ROOT / "matches" / tag / "replay.jsonl"),
-                       name_a=a, name_b=b)
+    wa = wb = 0
+    last = None
+    for k in range(best_of):
+        if wa * 2 >= best_of or wb * 2 >= best_of:
+            break  # già deciso
+        res, _ = run_match(load_decide(ag_a["preset"]), load_decide(ag_b["preset"]), seed + k * 7919,
+                           out_path=str(ROOT / "matches" / f"{tag}-g{k}" / "replay.jsonl"),
+                           name_a=a, name_b=b)
+        last = res
+        if res["winner"] == 0:
+            wa += 1
+        elif res["winner"] == 1:
+            wb += 1
+    winner = 0 if wa > wb else (1 if wb > wa else -1)
     from backend.store import connect, award_pair
     con = connect()
-    award_pair(con, a, b, "tourney", res["winner"], 2.0)  # tornei pagano doppio XP
+    award_pair(con, a, b, "tourney", winner, 2.0)  # tornei pagano doppio XP
     con.commit()
     con.close()
-    return {"a": a, "b": b, "seed": seed, "winner": res["winner"],
-            "s0": res["s0"], "s1": res["s1"], "hash": res["hash"],
-            "replay": f"{tag}/replay.jsonl",
-            "share": f"/viewer/?match={tag}",
+    return {"a": a, "b": b, "seed": seed, "winner": winner, "maps": f"{wa}-{wb}",
+            "s0": last["s0"], "s1": last["s1"], "hash": last["hash"],
+            "replay": f"{tag}-g0/replay.jsonl",
+            "share": f"/viewer/?match={tag}-g0",
             "league_a": LEAGUE_OF(ag_a["preset"]), "league_b": LEAGUE_OF(ag_b["preset"])}
 
 
