@@ -14,8 +14,9 @@ TIMEOUT_S = 0.6
 
 
 def run_race(decide_a, decide_b, seed: int, out_path: str | None = None,
-             name_a: str = "r1", name_b: str = "r2"):
-    st = new_race(seed)
+             name_a: str = "r1", name_b: str = "r2",
+             draft_a: dict | None = None, draft_b: dict | None = None):
+    st = new_race(seed, draft_a, draft_b)
     mem_a, mem_b = load_memory(name_a), load_memory(name_b)
     new_a, new_b = mem_a, mem_b
     replay = []

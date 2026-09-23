@@ -10,17 +10,17 @@ import hashlib
 import json
 from sim import engine as E
 
+from sim.sim import _mk_agent
 RACE_TICKS = 150
 
 
-def _mk(x, y):
-    return {"x": x, "y": y, "hp": 100, "wood": 0, "stone": 0, "gold": 0,
-            "sticks": 0, "has_sword": False, "walls_left": 5,
-            "dash_cd": 0, "shield": 0, "respawn_at": -1,
-            "alive": True, "noop_streak": 0, "timeouts": 0, "illegal": 0, "kills": 0}
+def _mk(x, y, loadout: dict | None = None):
+    a = _mk_agent((x, y), loadout)
+    a["respawn_at"] = -1
+    return a
 
 
-def new_race(seed: int) -> dict:
+def new_race(seed: int, loadout_a: dict | None = None, loadout_b: dict | None = None) -> dict:
     rng = random.Random(seed)
     spawns = [(2, 2), (29, 29)]
     if rng.random() < 0.5:
@@ -35,7 +35,7 @@ def new_race(seed: int) -> dict:
                 lst.append(p)
     return {"seed": seed, "tick": 0, "max_ticks": RACE_TICKS, "mode": "race",
             "respawn_counter": 0, "mutator": "", "spawns": spawns,
-            "agents": [_mk(*spawns[0]), _mk(*spawns[1])],
+            "agents": [_mk(*spawns[0], loadout_a), _mk(*spawns[1], loadout_b)],
             "trees": trees, "rocks": rocks, "golds": golds,
             "pending_respawns": [], "messages": ["", ""], "coach": [[], []],
             "walls": {}, "events": [[], []], "winner": None, "over": False}

@@ -19,6 +19,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--names", default="")
     ap.add_argument("--title", default="weekly")
+    ap.add_argument("--mode", default="", help="1v1 (default) o race; vuoto = alterna per settimana pari/dispari")
     args = ap.parse_args()
     if args.names:
         names = [n.strip() for n in args.names.split(",") if n.strip()]
@@ -28,9 +29,16 @@ def main():
         names = [r["name"] for r in leaderboard()[:8]]
     if len(names) < 8:
         import backend.store as _S
-        defaults = [("auto-greedy", "greedy"), ("auto-bt", "bt"), ("auto-rush", "greedy"),
-                    ("auto-turtle", "greedy"), ("auto-rand", "random"), ("auto-jev", "greedy"),
-                    ("auto-llm", "greedy"), ("auto-sq", "squad")]
+        import datetime as _dt
+        _odd = _dt.date.today().isocalendar()[1] % 2
+        if (args.mode or "") == "race" or (not args.mode and _odd):
+            defaults = [("auto-r1", "racer"), ("auto-r2", "racer"), ("auto-r3", "racer"),
+                        ("auto-r4", "racer"), ("auto-r5", "racer"), ("auto-r6", "racer"),
+                        ("auto-r7", "racer"), ("auto-r8", "racer")]
+        else:
+            defaults = [("auto-greedy", "greedy"), ("auto-bt", "bt"), ("auto-rush", "greedy"),
+                        ("auto-turtle", "greedy"), ("auto-rand", "random"), ("auto-jev", "greedy"),
+                        ("auto-llm", "greedy"), ("auto-sq", "squad")]
         for n, p in defaults:
             try:
                 _S.register_agent(n, p)
@@ -46,7 +54,8 @@ def main():
     import datetime
     muts = ["", "gold_rush", "no_swords", "fast_gas"]
     mut = muts[datetime.date.today().isocalendar()[1] % len(muts)]
-    rep = run_bracket(names, title=args.title, mutator=mut)
+    mode = args.mode if args.mode in ("1v1", "race") else ("race" if datetime.date.today().isocalendar()[1] % 2 else "1v1")
+    rep = run_bracket(names, title=args.title, mutator=mut, mode=mode)
     c = comment_tournament(rep)
     d = ROOT / "matches" / f"tourney-{rep['ts']}"
     (d / "commentary.md").write_text(c)
