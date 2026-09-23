@@ -28,7 +28,7 @@
   <button id="go">aggiorna</button>
   <a href="./">viewer 3D</a> <a href="./daily.html">daily</a> <a href="./bets.html">scommesse</a>
 </div>
-<table><thead><tr><th>#</th><th>nome</th><th>preset</th><th>elo</th><th>match</th></tr></thead>
+<table><thead><tr><th>#</th><th>nome</th><th>preset</th><th>elo ±rd</th><th>match</th></tr></thead>
 <tbody id="lb"><tr><td colspan="5">carico…</td></tr></tbody></table>
 <h2>Ultimi match</h2>
 <div id="matches" class="hint">i match appaiono dopo <code>POST /matches</code> + worker. Apri un replay con link share.</div>
@@ -41,7 +41,7 @@ async function load() {
   try {
     const lb = await (await fetch(`${base}/leaderboard${lg}${md}`)).json();
     $('lb').innerHTML = lb.map((r, i) =>
-      `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.preset}</td><td>${Math.round(r.elo)}</td><td>${r.games}</td></tr>`).join('') || '<tr><td colspan=5>vuota</td></tr>';
+      `<tr><td>${i + 1}</td><td><a href="./profile.html?name=${encodeURIComponent(r.name)}">${r.name}</a></td><td>${r.preset}</td><td>${Math.round(r.elo)} <span class="hint">±${Math.round(r.rd || 350)}</span></td><td>${r.games}</td></tr>`).join('') || '<tr><td colspan=5>vuota</td></tr>';
     // ultimi 8 match: prova id decrescenti (semplice, senza endpoint lista)
     let html = '';
     for (let id = 1; id <= 12; id++) {
