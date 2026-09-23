@@ -3,34 +3,27 @@ from __future__ import annotations
 import random
 import hashlib
 import json
-import re
+from sim import engine as _e
 
-W, H = 32, 32
-MAX_TICKS = 300
-VIEW_RADIUS = 7
-WALL_DURATION = 30
-RESPAWN_DELAY = 20
-TOTEM = (16, 16)
-GAS_DMG = 5          # sudden death fuori zona sicura
-BOUNTY = 5           # taglia su chi è in testa quando lo uccidi
+# Re-export: stessa interfaccia pubblica di prima, meccaniche in sim/engine.py
+W, H = _e.W, _e.H
+MAX_TICKS = _e.MAX_TICKS
+VIEW_RADIUS = _e.VIEW_RADIUS
+WALL_DURATION = _e.WALL_DURATION
+RESPAWN_DELAY = _e.RESPAWN_DELAY
+TOTEM = _e.TOTEM
+GAS_DMG = _e.GAS_DMG
+BOUNTY = _e.BOUNTY
+VALID_ACTIONS = _e.VALID_ACTIONS
+DIRS = _e.DIRS
+MSG_ALLOWED = _e.MSG_ALLOWED
+MSG_BANNED = _e.MSG_BANNED
 
-VALID_ACTIONS = {
-    "move_N", "move_S", "move_E", "move_W",
-    "gather", "craft_stick", "craft_sword", "craft_wall_kit",
-    "place_wall", "attack", "noop", "message",
-}
-
-MSG_ALLOWED = re.compile(r"[^a-zA-Z0-9 .,!?\-]")
-MSG_BANNED = re.compile(r"system|prompt|ignore|override", re.IGNORECASE)
-
-DIRS = {
-    "N": (0, -1), "S": (0, 1), "E": (1, 0), "W": (-1, 0),
-    "move_N": (0, -1), "move_S": (0, 1), "move_E": (1, 0), "move_W": (-1, 0),
-}
-
-
-def _manhattan(a, b):
-    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+_manhattan = _e.manhattan
+clean_message = _e.clean_message
+_wall_at = _e.wall_at
+_blocked = _e.blocked
+gas_radius = lambda state: _e.gas_radius_mt(state["tick"], state["max_ticks"])
 
 
 def new_match(seed: int, max_ticks: int = MAX_TICKS) -> dict:
@@ -75,6 +68,7 @@ def new_match(seed: int, max_ticks: int = MAX_TICKS) -> dict:
         "golds": golds,
         "pending_respawns": [],  # [due_tick, type]
         "messages": ["", ""],
+        "action_clock": 0,  # orologio stalli: reset su gather/kill/craft, draw a 100
         "coach": [[], []],  # per lato: [{"tick":t,"x":x,"y":y}] (cap 3, da livelli)
         "walls": {},  # "x,y" -> expiry_tick
         "events": [[], []],
@@ -110,61 +104,25 @@ def gas_radius(state: dict) -> float:
 
 
 def _free_cell(state, rng):
-    for _ in range(30):
-        p = (rng.randrange(W), rng.randrange(H))
-        if p == TOTEM or f"{p[0]},{p[1]}" in state["walls"]:
-            continue
-        if p in state["trees"] or p in state["rocks"] or p in state["golds"]:
-            continue
-        if any((a["x"], a["y"]) == p for a in state["agents"] if a["alive"]):
-            continue
-        return p
-    return None
+    alive = {(a["x"], a["y"]) for a in state["agents"] if a["alive"]}
+    return _e.free_cell(state, rng, alive)
 
 
 def _schedule_respawn(state, typ: str):
-    if state["tick"] >= 280:
-        return
-    state["pending_respawns"].append([state["tick"] + RESPAWN_DELAY, typ])
+    _e.schedule_respawn(state, typ)
 
 
 def _process_respawns(state):
-    due = [r for r in state["pending_respawns"] if r[0] <= state["tick"]]
-    state["pending_respawns"] = [r for r in state["pending_respawns"] if r[0] > state["tick"]]
-    caps = {"tree": 40, "rock": 20, "gold": 10}
-    lists = {"tree": state["trees"], "rock": state["rocks"], "gold": state["golds"]}
-    for due_tick, typ in due:
-        if len(lists[typ]) >= caps[typ]:
-            continue
-        state["respawn_counter"] += 1
-        rng = random.Random(f"{state['seed']}:{state['tick']}:{state['respawn_counter']}")
-        p = _free_cell(state, rng)
-        if p:
-            lists[typ].append(p)
-
-
-def clean_message(text) -> str:
-    if not isinstance(text, str):
-        return ""
-    t = MSG_ALLOWED.sub("", text)[:32].strip()
-    t = MSG_BANNED.sub("***", t)
-    return t
+    alive = {(a["x"], a["y"]) for a in state["agents"] if a["alive"]}
+    _e.process_respawns(state, alive)
 
 
 def _wall_at(state, x, y):
-    return f"{x},{y}" in state["walls"]
+    return _e.wall_at(state, x, y)
 
 
 def _blocked(state, x, y):
-    if not (0 <= x < W and 0 <= y < H):
-        return True
-    if _wall_at(state, x, y):
-        return True
-    if (x, y) in state["trees"] or (x, y) in state["rocks"] or (x, y) in state["golds"]:
-        return True
-    if (x, y) == TOTEM:
-        return True  # totem non calpestabile, solo adiacenza bonus
-    return False
+    return _e.blocked(state, x, y)
 
 
 def _push_event(state, pid, msg):
@@ -204,19 +162,9 @@ def _apply(state, pid, action: dict):
         me["noop_streak"] += 1
         return
 
-    # azioni utili resettano noop_streak solo se riescono
+    # azioni utili resettano noop_streak solo se riescono (meccaniche in engine)
     if raw == "gather":
-        for lst, res, typ in ((state["trees"], "wood", "tree"), (state["rocks"], "stone", "rock"), (state["golds"], "gold", "gold")):
-            for p in lst:
-                if _manhattan((me["x"], me["y"]), p) == 1:
-                    lst.remove(p)
-                    me[res] += 1
-                    me["noop_streak"] = 0
-                    _push_event(state, pid, f"gather_ok {res}")
-                    _schedule_respawn(state, typ)
-                    return
-        _push_event(state, pid, "gather_fail")
-        me["noop_streak"] += 1
+        _e.gather(state, me, lambda m: _push_event(state, pid, m))
         return
 
     if raw == "message":
@@ -232,43 +180,15 @@ def _apply(state, pid, action: dict):
         return
 
     if raw == "craft_stick":
-        if me["wood"] >= 2:
-            me["wood"] -= 2
-            me["sticks"] += 1
-            me["noop_streak"] = 0
-            _push_event(state, pid, "craft_ok stick")
-        else:
-            _push_event(state, pid, "craft_fail stick")
-            me["noop_streak"] += 1
+        _e.craft(me, "stick", lambda m: _push_event(state, pid, m))
         return
 
     if raw == "craft_sword":
-        if me["has_sword"]:
-            _push_event(state, pid, "craft_fail sword_owned")
-            me["noop_streak"] += 1
-        elif me["wood"] >= 3 and me["stone"] >= 2:
-            me["wood"] -= 3
-            me["stone"] -= 2
-            me["has_sword"] = True
-            me["noop_streak"] = 0
-            _push_event(state, pid, "craft_ok sword")
-        else:
-            _push_event(state, pid, "craft_fail sword")
-            me["noop_streak"] += 1
+        _e.craft(me, "sword", lambda m: _push_event(state, pid, m))
         return
 
     if raw == "craft_wall_kit":
-        if me["walls_left"] >= 20:
-            _push_event(state, pid, "craft_fail wall_cap")
-            me["noop_streak"] += 1
-        elif me["stone"] >= 2:
-            me["stone"] -= 2
-            me["walls_left"] += 1
-            me["noop_streak"] = 0
-            _push_event(state, pid, "craft_ok wall")
-        else:
-            _push_event(state, pid, "craft_fail wall")
-            me["noop_streak"] += 1
+        _e.craft(me, "wall", lambda m: _push_event(state, pid, m.replace("wall_kit", "wall")))
         return
 
     if raw == "place_wall":
@@ -278,25 +198,15 @@ def _apply(state, pid, action: dict):
             me["noop_streak"] += 1
             _push_event(state, pid, f"illegal:dir_{d}")
             return
-        if me["walls_left"] <= 0:
-            _push_event(state, pid, "wall_fail empty")
-            me["noop_streak"] += 1
-            return
-        if len(state["walls"]) >= 40:
-            _push_event(state, pid, "wall_fail cap")
-            me["noop_streak"] += 1
-            return
         dx, dy = DIRS[d]
         nx, ny = me["x"] + dx, me["y"] + dy
         other_pos = (foe["x"], foe["y"]) if foe["alive"] else None
-        if not (0 <= nx < W and 0 <= ny < H) or _wall_at(state, nx, ny) or (nx, ny) in state["trees"] or (nx, ny) in state["rocks"] or (nx, ny) in state["golds"] or (nx, ny) == TOTEM or (nx, ny) == other_pos:
-            _push_event(state, pid, "wall_fail blocked")
-            me["noop_streak"] += 1
-            return
-        me["walls_left"] -= 1
-        state["walls"][f"{nx},{ny}"] = state["tick"] + WALL_DURATION
-        me["noop_streak"] = 0
-        _push_event(state, pid, f"wall_ok {nx},{ny}")
+        others = {other_pos} if other_pos else set()
+        r = _e.place_wall(state, me, nx, ny, others)
+        if r == "ok":
+            _push_event(state, pid, f"wall_ok {nx},{ny}")
+        else:
+            _push_event(state, pid, f"wall_fail {r}")
         return
 
     if raw == "attack":
@@ -329,29 +239,18 @@ def step(state: dict, a1: dict, a2: dict) -> dict:
     for k in expired:
         del state["walls"][k]
     _process_respawns(state)
+    snap = [(a["kills"], a["wood"], a["stone"], a["gold"], a["has_sword"]) for a in state["agents"]]
     _apply(state, 0, a1)
     _apply(state, 1, a2)
-    # bleed anti-stallo: 3 noop/illegal di fila -> -5 hp
+    now = [(a["kills"], a["wood"], a["stone"], a["gold"], a["has_sword"]) for a in state["agents"]]
+    # orologio stalli: 100 tick senza gather/kill/craft -> draw tecnico (vince hp)
+    state["action_clock"] = 0 if now != snap else state["action_clock"] + 1
+    if state["action_clock"] >= 100:
+        state["over"] = True
     for pid in (0, 1):
-        me = state["agents"][pid]
-        if me["alive"] and me["noop_streak"] >= 3:
-            me["hp"] -= 5
-            me["noop_streak"] = 0
-            _push_event(state, pid, "bleed -5")
-            if me["hp"] <= 0:
-                me["hp"] = 0
-                me["alive"] = False
-    # sudden death: fuori dalla zona sicura -> gas
-    r = gas_radius(state)
-    if r < 99.0:
-        for pid in (0, 1):
-            me = state["agents"][pid]
-            if me["alive"] and _manhattan((me["x"], me["y"]), TOTEM) > r:
-                me["hp"] -= GAS_DMG
-                _push_event(state, pid, "gas -5")
-                if me["hp"] <= 0:
-                    me["hp"] = 0
-                    me["alive"] = False
+        _e.bleed(state["agents"][pid], lambda m, p=pid: _push_event(state, p, m))
+    for pid in (0, 1):
+        _e.gas_damage(state, state["agents"][pid], lambda m, p=pid: _push_event(state, p, m))
     if state["tick"] >= state["max_ticks"] or not (state["agents"][0]["alive"] or state["agents"][1]["alive"]):
         state["over"] = True
     return state

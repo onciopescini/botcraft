@@ -62,6 +62,18 @@ def run_season(decides: dict[str, object], seed: int, title: str = "season",
             if st["over"]:
                 break
     standings = sorted(((n, score_world(st, n)) for n in names), key=lambda kv: -kv[1])
+    try:
+        from backend.store import connect, XP_BASE
+        con = connect()
+        for rank, (n, _) in enumerate(standings):
+            frac = 1.0 if rank == 0 else (0.5 if rank == 1 else 0.25)
+            con.execute("INSERT INTO xp(name,xp) VALUES(?,?) "
+                        "ON CONFLICT(name) DO UPDATE SET xp=xp+?",
+                        (n, round(XP_BASE["world"] * frac), round(XP_BASE["world"] * frac)))
+        con.commit()
+        con.close()
+    except Exception:
+        pass
     report = {"v": 1, "mode": "world", "title": title, "seed": seed,
               "tick": st["tick"], "hash": world_hash(st),
               "standings": [{"name": n, "score": s} for n, s in standings],

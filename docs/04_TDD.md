@@ -55,3 +55,6 @@ Principio: **sim autorevole headless, renderer stupido, mediator paranoico.** Il
 
 ## 4.6 Cosa NON fare in S0
 Niente websocket realtime sim-viewer, niente auth complessa (token statico), niente K8s, niente training RL server-side.
+
+## 4.7 Stato 23/09 (architettura reale)
+Meccaniche in `sim/engine.py` (1v1/squad/world condividono gather/craft/wall/bleed/gas/respawn). Auth: Bearer (API_TOKENS o Discord OAuth -> token db) su POST, quote code-only/open + tornei/stagioni. Replay v1/v2 + delta mondo. Site statica su Pages (landing+viewer+builder), API Docker su Render, worker locale/Docker/Boxer-hook.

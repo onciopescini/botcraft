@@ -79,4 +79,10 @@ Pattern consigliato: **codice per reazioni veloci, LLM ogni 10 tick per strategi
 Questi due servono per testare sim, Elo e viewer senza LLM.
 
 ## 3.5 Pre-approvazione locale (prima di submit)
-Forniremo `sdk check ./my-agent` che fa: valida yaml, prova 10 tick contro random con seed fisso, misura tempo medio, stima token, blocca import vietati. Se non passa in locale, il server rifiuta.
+`sdk check ./my-agent` valida yaml, prova 20 tick contro random, misura tempo, blocca import vietati.
+
+## 3.6 Stato 23/09 (aggiunte dopo MVP)
+- Preset: random|greedy|llm-greedy (OpenRouter BYOK)|jev-greedy (Jev async ogni 10 tick)|squad|bt (behavior-tree didattico).
+- `obs["coach"]` (ping pre-match), `obs["memory"]` (10KB+bonus livelli), `obs["gas_radius"]`, gold x3, bounty +5 su leader, sudden death ultimi 1/6.
+- Modi: 1v1 (300), blitz (60, Elo separato), squad 3v3, daily seed unico, mondo FFA.
+- Progressione: XP/livelli/memoria+ping bonus, prompt pack a coin, coin scommesse pari-mutuel.

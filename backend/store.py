@@ -55,6 +55,10 @@ def init():
     CREATE TABLE IF NOT EXISTS xp(
       name TEXT PRIMARY KEY, xp INTEGER NOT NULL DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS owned(
+      name TEXT NOT NULL, pack TEXT NOT NULL,
+      PRIMARY KEY (name, pack)
+    );
     """)
     con.commit()
     for ddl in ("ALTER TABLE agents ADD COLUMN elo_squad REAL NOT NULL DEFAULT 1200",
@@ -238,6 +242,38 @@ def record_use(token: str):
     con.close()
 
 
+PACKS = {"greedy-opener": 50, "sword-rush": 100, "totem-close": 200}
+
+
+def owned_packs(name: str) -> list[str]:
+    con = connect()
+    rows = con.execute("SELECT pack FROM owned WHERE name=?", (name,)).fetchall()
+    con.close()
+    return [r["pack"] for r in rows]
+
+
+def buy_pack(name: str, pack: str) -> str:
+    """Compra conoscenza con coin vinte. MAI effetti automatici nel sim."""
+    if pack not in PACKS:
+        raise ValueError("pack inesistente")
+    con = connect()
+    ag = con.execute("SELECT coins FROM agents WHERE name=?", (name,)).fetchone()
+    if not ag:
+        con.close()
+        raise ValueError("agente inesistente")
+    if con.execute("SELECT 1 FROM owned WHERE name=? AND pack=?", (name, pack)).fetchone():
+        con.close()
+        return "owned"
+    if ag["coins"] < PACKS[pack]:
+        con.close()
+        raise ValueError(f"servono {PACKS[pack]} coin (ne hai {ag['coins']})")
+    con.execute("UPDATE agents SET coins=coins-? WHERE name=?", (PACKS[pack], name))
+    con.execute("INSERT INTO owned(name,pack) VALUES(?,?)", (name, pack))
+    con.commit()
+    con.close()
+    return "ok"
+
+
 def pending_count() -> int:
     con = connect()
     row = con.execute("SELECT COUNT(*) c FROM matches WHERE status='pending'").fetchone()
@@ -245,7 +281,7 @@ def pending_count() -> int:
     return row["c"]
 
 
-XP_BASE = {"blitz": 10, "1v1": 20, "squad": 30, "daily": 15}
+XP_BASE = {"blitz": 10, "1v1": 20, "squad": 30, "daily": 15, "world": 30, "tourney": 20}
 
 
 def level_of(xp: int) -> int:
@@ -275,19 +311,24 @@ def award_xp(mid: int, winner: int, s0: int, s1: int):
     if not m:
         con.close()
         return
-    base = XP_BASE.get(m["mode"], 20)
-    for name, score, won in ((m["a"], s0, winner == 0), (m["b"], s1, winner == 1)):
-        ag = con.execute("SELECT * FROM agents WHERE name=?", (name,)).fetchone()
-        opp = m["b"] if name == m["a"] else m["a"]
-        op = con.execute("SELECT * FROM agents WHERE name=?", (opp,)).fetchone()
-        ecol = {"squad": "elo_squad", "blitz": "elo_blitz"}.get(m["mode"], "elo")
-        gap = max(0.0, (op[ecol] if op else 1200) - (ag[ecol] if ag else 1200)) if ag else 0.0
-        mult = 1.0 + min(1.0, gap / 800.0)
-        pts = round(base * mult * (1.0 if won else (0.5 if winner == -1 else 0.25)))
-        con.execute("INSERT INTO xp(name,xp) VALUES(?,?) "
-                    "ON CONFLICT(name) DO UPDATE SET xp=xp+?", (name, pts, pts))
+    award_pair(con, m["a"], m["b"], m["mode"], winner, 1.0)
     con.commit()
     con.close()
+
+
+def award_pair(con, a: str, b: str, mode: str, winner: int, mult: float):
+    """XP diretta senza riga matches (tornei x2, mondo)."""
+    base = XP_BASE.get(mode, 20)
+    ecol = {"squad": "elo_squad", "blitz": "elo_blitz"}.get(mode, "elo")
+    for name, won in ((a, winner == 0), (b, winner == 1)):
+        ag = con.execute("SELECT * FROM agents WHERE name=?", (name,)).fetchone()
+        opp = b if name == a else a
+        op = con.execute("SELECT * FROM agents WHERE name=?", (opp,)).fetchone()
+        gap = max(0.0, (op[ecol] if op else 1200) - (ag[ecol] if ag else 1200)) if ag else 0.0
+        pts = round(base * mult * (1.0 + min(1.0, gap / 800.0))
+                    * (1.0 if won else (0.5 if winner == -1 else 0.25)))
+        con.execute("INSERT INTO xp(name,xp) VALUES(?,?) "
+                    "ON CONFLICT(name) DO UPDATE SET xp=xp+?", (name, pts, pts))
 
 
 def daily_seed() -> tuple[str, int]:

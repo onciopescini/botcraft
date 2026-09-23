@@ -4,6 +4,7 @@ import random
 import hashlib
 import json
 import sim.sim as base
+from sim import engine as _e
 
 WORLD_W, WORLD_H = 64, 64
 VIEW_RADIUS = 7
@@ -39,9 +40,10 @@ def new_world(seed: int, names: list[str], w: int = WORLD_W, h: int = WORLD_H) -
         a = _mk(*p)
         a["spawn"] = list(p)
         agents[n] = a
-    return {"seed": seed, "tick": 0, "w": w, "h": h, "counter": 0,
+    return {"seed": seed, "tick": 0, "w": w, "h": h, "max_ticks": 500,
+            "totem": list(TOTEM), "respawn_counter": 0,
             "agents": agents, "trees": trees, "rocks": rocks, "golds": golds,
-            "pending": [], "messages": {}, "walls": {}, "events": {n: [] for n in names},
+            "pending_respawns": [], "messages": {}, "walls": {}, "events": {n: [] for n in names},
             "over": False}
 
 
@@ -60,41 +62,20 @@ def _ev(st, n, msg):
         del ev[0]
 
 
-def _free(st, rng):
-    for _ in range(40):
-        p = (rng.randrange(st["w"]), rng.randrange(st["h"]))
-        if p == TOTEM or f"{p[0]},{p[1]}" in st["walls"]:
-            continue
-        if p in st["trees"] or p in st["rocks"] or p in st["golds"]:
-            continue
-        if any(a["alive"] and (a["x"], a["y"]) == p for a in st["agents"].values()):
-            continue
-        return p
-    return None
-
-
 def step_world(st, acts: dict) -> dict:
     if st["over"]:
         return st
     st["tick"] += 1
     for k in [k for k, exp in st["walls"].items() if exp <= st["tick"]]:
         del st["walls"][k]
-    # respawn risorse
-    due = [r for r in st["pending"] if r[0] <= st["tick"]]
-    st["pending"] = [r for r in st["pending"] if r[0] > st["tick"]]
-    caps = {"tree": st["w"], "rock": st["w"] // 2, "gold": st["w"] // 4}
-    lists = {"tree": st["trees"], "rock": st["rocks"], "gold": st["golds"]}
-    for _, typ in due:
-        if len(lists[typ]) >= caps[typ] or st["tick"] >= MAX_TICKS - 20:
-            continue
-        st["counter"] += 1
-        p = _free(st, random.Random(f"{st['seed']}:{st['tick']}:{st['counter']}"))
-        if p:
-            lists[typ].append(p)
+    # respawn risorse (engine, cap proporzionali alla mappa)
+    _e.process_respawns(st, {(a["x"], a["y"]) for a in st["agents"].values() if a["alive"]},
+                        caps={"tree": st["w"], "rock": st["w"] // 2, "gold": st["w"] // 4},
+                        tries=40)
     # respawn agenti
     for a in st["agents"].values():
         if not a["alive"] and st["tick"] - a["dead_at"] >= RESPAWN_AGENT:
-            a.update(x=a["spawn"][0], y=a["spawn"][1], hp=100, alive=True, noop_streak=0)
+            a.update(x=a["spawn"][0], y=a["spawn"][1], hp=100, alive=True, noop_streak=0, dead_at=-1)
     order = sorted(st["agents"])
     for n in order:
         me = st["agents"][n]
@@ -118,47 +99,16 @@ def step_world(st, acts: dict) -> dict:
         elif raw == "noop":
             me["noop_streak"] += 1
         elif raw == "gather":
-            hit = False
-            for lst, res, typ in ((st["trees"], "wood", "tree"), (st["rocks"], "stone", "rock"), (st["golds"], "gold", "gold")):
-                for p in lst:
-                    if abs(me["x"] - p[0]) + abs(me["y"] - p[1]) == 1:
-                        lst.remove(p)
-                        me[res] += 1
-                        me["noop_streak"] = 0
-                        _ev(st, n, f"gather_ok {res}")
-                        st["pending"].append([st["tick"] + 20, typ])
-                        hit = True
-                        break
-                if hit:
-                    break
-            if not hit:
-                me["noop_streak"] += 1
+            _e.gather(st, me, lambda m: _ev(st, n, m))
         elif raw == "craft_sword":
-            if not me["has_sword"] and me["wood"] >= 3 and me["stone"] >= 2:
-                me["wood"] -= 3
-                me["stone"] -= 2
-                me["has_sword"] = True
-                me["noop_streak"] = 0
-            else:
-                me["noop_streak"] += 1
+            _e.craft(me, "sword", lambda m: None)  # world: craft silenziosi
         elif raw == "craft_wall_kit":
-            if me["walls_left"] < 20 and me["stone"] >= 2:
-                me["stone"] -= 2
-                me["walls_left"] += 1
-                me["noop_streak"] = 0
-            else:
-                me["noop_streak"] += 1
+            _e.craft(me, "wall", lambda m: None)
         elif raw == "place_wall":
             d = act.get("dir", "E") if isinstance(act, dict) else "E"
             dx, dy = base.DIRS.get(d, (1, 0))
-            nx, ny = me["x"] + dx, me["y"] + dy
             occ = {(a["x"], a["y"]) for k, a in st["agents"].items() if a["alive"] and k != n}
-            if me["walls_left"] > 0 and len(st["walls"]) < 80 and 0 <= nx < st["w"] and 0 <= ny < st["h"] and f"{nx},{ny}" not in st["walls"] and (nx, ny) not in st["trees"] and (nx, ny) not in st["rocks"] and (nx, ny) not in st["golds"] and (nx, ny) != TOTEM and (nx, ny) not in occ:
-                me["walls_left"] -= 1
-                st["walls"][f"{nx},{ny}"] = st["tick"] + base.WALL_DURATION
-                me["noop_streak"] = 0
-            else:
-                me["noop_streak"] += 1
+            _e.place_wall(st, me, me["x"] + dx, me["y"] + dy, occ, cap=80)
         elif raw == "attack":
             dmg = 20 if me["has_sword"] else 10
             target = None
@@ -189,20 +139,10 @@ def step_world(st, acts: dict) -> dict:
             else:
                 me["noop_streak"] += 1
         elif raw == "craft_stick":
-            if me["wood"] >= 2:
-                me["wood"] -= 2
-                me["sticks"] += 1
-                me["noop_streak"] = 0
-            else:
-                me["noop_streak"] += 1
+            _e.craft(me, "stick", lambda m: None)
     for a in st["agents"].values():
-        if a["alive"] and a["noop_streak"] >= 3:
-            a["hp"] -= 5
-            a["noop_streak"] = 0
-            if a["hp"] <= 0:
-                a["hp"] = 0
-                a["alive"] = False
-                a["dead_at"] = st["tick"]
+        if _e.bleed(a, lambda m: None) and a["dead_at"] < 0:
+            a["dead_at"] = st["tick"]
     if st["tick"] >= MAX_TICKS:
         st["over"] = True
     return st

@@ -1,9 +1,10 @@
-"""Squad 3v3 Botcraft S2 — riusa helpers sim.sim, stato separato a 6 unità."""
+"""Squad 3v3 Botcraft S2 — meccaniche in sim/engine.py, stato separato a 6 unità."""
 from __future__ import annotations
 import random
 import hashlib
 import json
 import sim.sim as base
+from sim import engine as _e
 
 W, H, VIEW_RADIUS, WALL_DURATION, TOTEM, MAX_TICKS = (
     base.W, base.H, base.VIEW_RADIUS, base.WALL_DURATION, base.TOTEM, base.MAX_TICKS)
@@ -28,6 +29,7 @@ def new_match_squad(seed: int) -> dict:
                   _mk(*spawns_b[0]), _mk(*spawns_b[1]), _mk(*spawns_b[2])],
         "trees": s1["trees"], "rocks": s1["rocks"], "golds": s1["golds"],
         "pending_respawns": [], "messages": ["", ""], "walls": {},
+        "action_clock": 0,
         "events": [[], [], [], [], [], []], "over": False,
     }
 
@@ -36,38 +38,13 @@ def _alive_pos(st, skip=-1):
     return {(u["x"], u["y"]) for i, u in enumerate(st["units"]) if u["alive"] and i != skip}
 
 
-def _free_cell_squad(st, rng):
-    for _ in range(30):
-        p = (rng.randrange(W), rng.randrange(H))
-        if p == TOTEM or f"{p[0]},{p[1]}" in st["walls"]:
-            continue
-        if p in st["trees"] or p in st["rocks"] or p in st["golds"]:
-            continue
-        if any((u["x"], u["y"]) == p for u in st["units"] if u["alive"]):
-            continue
-        return p
-    return None
-
-
 def _process_respawns_squad(st):
-    due = [r for r in st["pending_respawns"] if r[0] <= st["tick"]]
-    st["pending_respawns"] = [r for r in st["pending_respawns"] if r[0] > st["tick"]]
-    caps = {"tree": 40, "rock": 20, "gold": 10}
-    lists = {"tree": st["trees"], "rock": st["rocks"], "gold": st["golds"]}
-    for due_tick, typ in due:
-        if len(lists[typ]) >= caps[typ]:
-            continue
-        st["respawn_counter"] += 1
-        rng = random.Random(f"{st['seed']}:{st['tick']}:{st['respawn_counter']}")
-        p = _free_cell_squad(st, rng)
-        if p:
-            lists[typ].append(p)
+    alive = {(u["x"], u["y"]) for u in st["units"] if u["alive"]}
+    _e.process_respawns(st, alive)
 
 
 def _schedule_squad(st, typ: str):
-    if st["tick"] >= 280:
-        return
-    st["pending_respawns"].append([st["tick"] + base.RESPAWN_DELAY, typ])
+    _e.schedule_respawn(st, typ)
 
 
 def _apply_unit(st, idx, action):
@@ -96,66 +73,25 @@ def _apply_unit(st, idx, action):
         me["noop_streak"] += 1
         return
     if raw == "gather":
-        for lst, res, typ in ((st["trees"], "wood", "tree"), (st["rocks"], "stone", "rock"), (st["golds"], "gold", "gold")):
-            for p in lst:
-                if base._manhattan((me["x"], me["y"]), p) == 1:
-                    lst.remove(p)
-                    me[res] += 1
-                    me["noop_streak"] = 0
-                    base._push_event(st, idx, f"gather_ok {res}")
-                    base._schedule_respawn(st, typ)
-                    return
-        base._push_event(st, idx, "gather_fail")
-        me["noop_streak"] += 1
+        _e.gather(st, me, lambda m: base._push_event(st, idx, m))
         return
     if raw == "craft_sword":
-        if me["has_sword"]:
-            base._push_event(st, idx, "craft_fail sword_owned")
-            me["noop_streak"] += 1
-        elif me["wood"] >= 3 and me["stone"] >= 2:
-            me["wood"] -= 3
-            me["stone"] -= 2
-            me["has_sword"] = True
-            me["noop_streak"] = 0
-            base._push_event(st, idx, "craft_ok sword")
-        else:
-            base._push_event(st, idx, "craft_fail sword")
-            me["noop_streak"] += 1
+        _e.craft(me, "sword", lambda m: base._push_event(st, idx, m))
         return
     if raw == "craft_stick":
-        if me["wood"] >= 2:
-            me["wood"] -= 2
-            me["sticks"] += 1
-            me["noop_streak"] = 0
-            base._push_event(st, idx, "craft_ok stick")
-        else:
-            base._push_event(st, idx, "craft_fail stick")
-            me["noop_streak"] += 1
+        _e.craft(me, "stick", lambda m: base._push_event(st, idx, m))
         return
     if raw == "craft_wall_kit":
-        if me["walls_left"] >= 20:
-            me["noop_streak"] += 1
-        elif me["stone"] >= 2:
-            me["stone"] -= 2
-            me["walls_left"] += 1
-            me["noop_streak"] = 0
-            base._push_event(st, idx, "craft_ok wall")
-        else:
-            me["noop_streak"] += 1
+        # squad resta silenziosa sui fail (solo craft_ok)
+        _e.craft(me, "wall", lambda m: base._push_event(st, idx, m) if m.startswith("craft_ok") else None)
         return
     if raw == "place_wall":
         d = action.get("dir", "E") if isinstance(action, dict) else "E"
-        if d not in base.DIRS or me["walls_left"] <= 0 or len(st["walls"]) >= 40:
+        if d not in base.DIRS:
             me["noop_streak"] += 1
             return
         dx, dy = base.DIRS[d]
-        nx, ny = me["x"] + dx, me["y"] + dy
-        if not (0 <= nx < W and 0 <= ny < H) or base._wall_at(st, nx, ny) or (nx, ny) in st["trees"] or (nx, ny) in st["rocks"] or (nx, ny) in st["golds"] or (nx, ny) == TOTEM or (nx, ny) in _alive_pos(st, idx):
-            me["noop_streak"] += 1
-            return
-        me["walls_left"] -= 1
-        st["walls"][f"{nx},{ny}"] = st["tick"] + WALL_DURATION
-        me["noop_streak"] = 0
+        _e.place_wall(st, me, me["x"] + dx, me["y"] + dy, _alive_pos(st, idx))
         return
     if raw == "attack":
         for f in foes:
@@ -193,25 +129,19 @@ def step_squad(st, acts: list) -> dict:
     for k in expired:
         del st["walls"][k]
     _process_respawns_squad(st)
+    snap = [(u["kills"], u["wood"], u["stone"], u["gold"], u["has_sword"]) for u in st["units"]]
     for idx in range(6):
         _apply_unit(st, idx, acts[idx] if idx < len(acts) else {"action": "noop"})
+    now = [(u["kills"], u["wood"], u["stone"], u["gold"], u["has_sword"]) for u in st["units"]]
+    st["action_clock"] = 0 if now != snap else st["action_clock"] + 1
+    if st["action_clock"] >= 100:
+        st["over"] = True
     for u in st["units"]:
-        if u["alive"] and u["noop_streak"] >= 3:
-            u["hp"] -= 5
-            u["noop_streak"] = 0
-            if u["hp"] <= 0:
-                u["hp"] = 0
-                u["alive"] = False
-    # sudden death condivisa (mt=300 fisso squad)
+        _e.bleed(u, lambda m: None)  # squad: bleed silenzioso
+    # sudden death condivisa (silenziosa)
     _probe = {"tick": st["tick"], "max_ticks": 300}
-    r = base.gas_radius(_probe)
-    if r < 99.0:
-        for u in st["units"]:
-            if u["alive"] and base._manhattan((u["x"], u["y"]), base.TOTEM) > r:
-                u["hp"] -= base.GAS_DMG
-                if u["hp"] <= 0:
-                    u["hp"] = 0
-                    u["alive"] = False
+    for u in st["units"]:
+        _e.gas_damage(_probe, u, lambda m: None)
     alive_a = any(u["alive"] for u in st["units"][:3])
     alive_b = any(u["alive"] for u in st["units"][3:])
     if st["tick"] >= MAX_TICKS or not (alive_a or alive_b) or not (alive_a and alive_b):

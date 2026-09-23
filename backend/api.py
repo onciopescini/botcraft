@@ -212,7 +212,7 @@ def list_tourneys():
 
 @app.get("/agents/{name}")
 def agent_profile(name: str):
-    from backend.store import get_agent, recent_matches, get_progress
+    from backend.store import get_agent, recent_matches, get_progress, owned_packs
     ag = get_agent(name)
     if not ag:
         raise HTTPException(404, "agente inesistente")
@@ -242,6 +242,7 @@ def agent_profile(name: str):
             "elo_squad": ag.get("elo_squad", 1200), "games_squad": ag.get("games_squad", 0),
             "elo_blitz": ag.get("elo_blitz", 1200), "games_blitz": ag.get("games_blitz", 0),
             "coins": ag.get("coins", 100), "progress": get_progress(name),
+            "packs": owned_packs(name),
             "badges": badges, "recent": recent,
             "share": f"/viewer/profile.html?name={name}"}
 
@@ -374,7 +375,6 @@ class BetIn(BaseModel):
     pick: str  # a|b
     amount: int
 
-
 @app.post("/bets")
 def post_bet(inp: BetIn, req: Request):
     from backend.store import place_bet, get_agent
@@ -394,3 +394,32 @@ def get_coins(name: str):
     if not get_agent(name):
         raise HTTPException(404, "agente inesistente")
     return {"name": name, "coins": coins_of(name)}
+
+
+@app.get("/prompts")
+def list_prompts():
+    from backend.store import PACKS
+    out = []
+    for pack, price in PACKS.items():
+        p = ROOT / "prompts" / f"{pack}.md"
+        out.append({"pack": pack, "price": price,
+                    "preview": p.read_text()[:300] if p.exists() else ""})
+    return out
+
+
+class BuyIn(BaseModel):
+    name: str
+    pack: str
+
+
+@app.post("/prompts/buy")
+def buy_prompt(inp: BuyIn, req: Request):
+    from backend.store import buy_pack
+    require_token(req)
+    try:
+        st = buy_pack(inp.name, inp.pack)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    p = ROOT / "prompts" / f"{inp.pack}.md"
+    return {"status": st, "pack": inp.pack,
+            "content": p.read_text() if p.exists() else ""}

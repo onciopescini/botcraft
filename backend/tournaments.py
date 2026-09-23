@@ -34,6 +34,11 @@ def play_pair(a: str, b: str, seed: int, tag: str):
     res, _ = run_match(load_decide(ag_a["preset"]), load_decide(ag_b["preset"]), seed,
                        out_path=str(ROOT / "matches" / tag / "replay.jsonl"),
                        name_a=a, name_b=b)
+    from backend.store import connect, award_pair
+    con = connect()
+    award_pair(con, a, b, "tourney", res["winner"], 2.0)  # tornei pagano doppio XP
+    con.commit()
+    con.close()
     return {"a": a, "b": b, "seed": seed, "winner": res["winner"],
             "s0": res["s0"], "s1": res["s1"], "hash": res["hash"],
             "replay": f"{tag}/replay.jsonl",
