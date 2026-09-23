@@ -34,8 +34,10 @@ def t_api():
     assert c.get("/world/seasons").status_code == 200
 def t_viewer():
     import subprocess
-    r = subprocess.run(["node", "--check", "viewer/viewer.js"], capture_output=True)
-    assert r.returncode == 0
+    for f in ["viewer/js/config.js", "viewer/js/scene.js", "viewer/js/actors.js",
+              "viewer/js/fx.js", "viewer/js/app.js", "site/builder-gen.js"]:
+        r = subprocess.run(["node", "--check", f], capture_output=True)
+        assert r.returncode == 0, f
 def t_gateway():
     from llm.gateway import Budget
     b = Budget(10)

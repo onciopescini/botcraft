@@ -5,15 +5,33 @@ import sys
 import time
 import pathlib
 
-BLOCKED = {"socket", "subprocess", "ctypes", "multiprocessing", "threading",
-           "os", "sys", "pathlib", "shutil", "importlib"}
-BLOCKED_CALLS = {"eval", "exec", "__import__", "open", "compile"}
+BLOCKED_IMPORTS = {
+    "socket", "subprocess", "ctypes", "multiprocessing", "threading",
+    "os", "sys", "pathlib", "shutil", "importlib", "inspect", "marshal",
+    "pickle", "cPickle", "base64", "urllib", "http", "ftplib", "smtplib",
+    "telnetlib", "xmlrpc", "pydoc", "code", "codeop", "runpy", "pkgutil",
+    "imp", "pty", "tty", "glob", "signal", "atexit", "webbrowser",
+}
+BLOCKED_CALLS = {"eval", "exec", "__import__", "compile",
+                 "getattr", "setattr", "delattr",
+                 "breakpoint", "exit", "quit", "help", "input",
+                 "memoryview", "globals", "locals", "vars", "dir"}
+WARN_CALLS = {"open", "hasattr"}  # open: ok in lettura (fs read-only in sandbox), mai per chiavi
+BLOCKED_ATTRS = {"__class__", "__bases__", "__subclasses__", "__mro__",
+                 "__dict__", "__builtins__", "__globals__", "__code__",
+                 "__closure__", "__func__", "__self__",
+                 "gi_frame", "f_locals", "f_globals", "f_builtins"}
+ALLOWED_DEPS = {"", "numpy"}
 
 
 def scan(path: pathlib.Path):
+    """Ritorna (errori, warning). Errori = rifiuto, warning = ammesso con log."""
     src = path.read_text()
-    tree = ast.parse(src)
-    errors = []
+    try:
+        tree = ast.parse(src)
+    except SyntaxError as e:
+        return [f"sintassi invalida: {e}"], []
+    errors, warnings = [], []
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             mods = []
@@ -23,21 +41,36 @@ def scan(path: pathlib.Path):
                 if node.module:
                     mods = [node.module.split(".")[0]]
             for m in mods:
-                if m in BLOCKED and m not in ("os",):
-                    # os ammesso solo per path locali? no: blocca tutto tranne casi noti.
-                    # S0 strict: blocca socket/subprocess/ctypes, avvisa su os.
-                    pass
-            for m in mods:
-                if m in ("socket", "subprocess", "ctypes"):
+                if m in BLOCKED_IMPORTS:
                     errors.append(f"import vietato: {m} riga {node.lineno}")
         if isinstance(node, ast.Call):
             f = node.func
             name = f.id if isinstance(f, ast.Name) else getattr(f, "attr", "")
-            if name in ("eval", "exec", "__import__"):
+            if name in BLOCKED_CALLS:
                 errors.append(f"chiamata vietata: {name} riga {node.lineno}")
-    if "OPENROUTER_API_KEY" in src or "api_key" in src.lower():
-        errors.append("chiave API dentro il codice: mettila nel profilo, mai nello zip")
-    return errors
+            elif name in WARN_CALLS:
+                warnings.append(f"lettura file riga {node.lineno}: ok solo lettura, mai chiavi")
+        if isinstance(node, ast.Attribute) and node.attr in BLOCKED_ATTRS:
+            errors.append(f"attributo vietato: {node.attr} riga {node.lineno}")
+    low = src.lower()
+    if "openrouter_api_key" in low or "typesafe_api_key" in low or "vercel_ai_gateway_key" in low or "api_key" in low or "secret" in low:
+        errors.append("chiave/secret dentro il codice: mettila nel profilo, mai nello zip")
+    return errors, warnings
+
+
+def check_requirements(root: pathlib.Path):
+    req = root / "requirements.txt"
+    if not req.exists():
+        return []
+    bad = []
+    for line in req.read_text().splitlines():
+        line = line.strip().lower()
+        if not line or line.startswith("#"):
+            continue
+        pkg = __import__("re").split(r"[<>=!~\s\[]", line)[0]
+        if pkg not in ALLOWED_DEPS:
+            bad.append(f"dipendenza vietata: {line} (ammesse: nessuna o numpy)")
+    return bad
 
 
 def main(agent_dir: str):
@@ -48,9 +81,13 @@ def main(agent_dir: str):
         print("MANCA agent.py"); return 2
     if not cap.exists():
         print("MANCA capabilities.yaml"); return 2
-    errs = scan(agent_py)
+    errs, warns = scan(agent_py)
+    for w in check_requirements(root):
+        errs.append(w)
     if errs:
         print("SCAN FALLITO:"); [print(" -", e) for e in errs]; return 2
+    for w in warns:
+        print("warning:", w)
     print("scan ok: nessun import vietato")
     # dry-run 20 tick vs random
     sys.path.insert(0, str(root))

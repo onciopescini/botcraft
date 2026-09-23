@@ -157,14 +157,14 @@ async def upload_agent(file: UploadFile = File(...)):
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as tf:
         tf.write(src)
         tf.flush()
-        errs = scan(pathlib.Path(tf.name))
+        errs, warns = scan(pathlib.Path(tf.name))
     h = hashlib.sha256(raw).hexdigest()[:16]
     if errs:
         return {"status": "rejected", "hash": h, "errors": errs}
     updir = ROOT / "backend" / "uploads"
     updir.mkdir(parents=True, exist_ok=True)
     (updir / f"{h}.zip").write_bytes(raw)
-    return {"status": "quarantined", "hash": h,
+    return {"status": "quarantined", "hash": h, "warnings": warns,
             "hint": "validato e firmato. Esecuzione custom attiva solo con worker Docker; in locale usa preset random|greedy|llm-greedy"}
 
 

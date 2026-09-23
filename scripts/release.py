@@ -24,9 +24,11 @@ def main():
     shutil.copy(ROOT / "matches" / "1" / "replay.jsonl", ROOT / "viewer" / "demo.jsonl")
     # site/viewer è la copia deployata su Pages: sincronizza (sorgente = viewer/)
     (ROOT / "site" / "viewer").mkdir(parents=True, exist_ok=True)
-    for p in (ROOT / "viewer").glob("*"):
+    for p in sorted((ROOT / "viewer").rglob("*")):
         if p.is_file() and p.name != "demo.jsonl.bak":
-            shutil.copy(p, ROOT / "site" / "viewer" / p.name)
+            dst = ROOT / "site" / "viewer" / p.relative_to(ROOT / "viewer")
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(p, dst)
     # itch.io vuole index.html in root dello zip
     out = ROOT / "botcraft-itch.zip"
     if out.exists():
