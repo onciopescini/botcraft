@@ -9,6 +9,14 @@ function generateBot(cfg) {
   const talk = cfg.trashTalk
     ? `\n    if enemy.get("visible") and obs["tick"] % 50 == 25 and me["hp"] > 80:\n        return {"action": "message", "text": "ti vedo!"}\n`
     : '';
+  const raceHead = cfg.race
+    ? `    # modo corsa: dritto al totem, dash quando lontano
+    dx, dy = 16 - x, 16 - y
+    _dir = ("move_E" if dx > 0 else "move_W") if abs(dx) >= abs(dy) else ("move_S" if dy > 0 else "move_N")
+    if abs(dx) + abs(dy) > 6 and me.get("dash_cd", 1) == 0:
+        return {"action": "dash", "dir": _dir.split("_")[1]}
+`
+    : '';
   const code =
 `"""${name} — generato dal Bot Builder (archetipo ${cfg.archetype}).
 Aggressione ${cfg.aggression} · Ingordigia ${cfg.greed} · Guardia ${cfg.guard}
@@ -27,7 +35,7 @@ def decide(obs):
             return {"action": "attack"}
         if me["has_sword"] and me["hp"] > ${aggroHp}:
             return _go(x, y, ex, ey)
-${talk}    for e in obs.get("nearby", []):
+${talk}${raceHead}    for e in obs.get("nearby", []):
         if abs(e["x"] - x) + abs(e["y"] - y) == 1:
             return {"action": "gather"}
     if obs["tick"] > ${campTick}:
@@ -66,6 +74,7 @@ const ARCHETYPES = {
   rusher: { aggression: 90, greed: 20, guard: 10, craftSword: true, trashTalk: true },
   farmer: { aggression: 15, greed: 95, guard: 20, craftSword: true, trashTalk: false },
   turtle: { aggression: 20, greed: 40, guard: 90, craftSword: true, trashTalk: false },
+  racer: { aggression: 60, greed: 70, guard: 0, craftSword: true, trashTalk: false, race: true },
 };
 
 if (typeof module !== 'undefined') { module.exports = { generateBot, ARCHETYPES }; }

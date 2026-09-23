@@ -183,6 +183,7 @@ async def upload_agent(file: UploadFile = File(...)):
 class TourneyIn(BaseModel):
     names: list[str]
     title: str = "weekly"
+    mode: str = "1v1"  # 1v1|race
 
 
 @app.post("/tournaments")
@@ -195,7 +196,8 @@ def post_tourney(inp: TourneyIn, req: Request):
         raise HTTPException(429, "quota tornei giornaliera esaurita")
     from backend.tournaments import run_bracket
     from backend.caster import comment_tournament
-    rep = run_bracket(inp.names, title=inp.title[:40])
+    rep = run_bracket(inp.names, title=inp.title[:40],
+                      mode=inp.mode if inp.mode in ("1v1", "race") else "1v1")
     commentary = comment_tournament(rep)
     (ROOT / "matches" / f"tourney-{rep['ts']}" / "commentary.md").write_text(commentary)
     record_use(tok)

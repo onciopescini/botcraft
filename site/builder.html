@@ -17,7 +17,7 @@
   h1 { font-size:30px; margin:0 0 6px; grid-column:1/-1; }
   .sub { grid-column:1/-1; color:var(--mut); margin:0 0 8px; }
   .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; }
-  .arch { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .arch { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
   .arch button { background:#1a2338; color:#fff; border:1px solid #3a4c72; border-radius:10px; padding:12px 8px; cursor:pointer; font-size:14px; }
   .arch button.on { border-color:var(--oro); background:#241f08; }
   .arch small { display:block; font-size:11px; color:var(--mut); }
@@ -66,7 +66,7 @@
 <script>
 const $ = id => document.getElementById(id);
 let arch = 'balanced';
-const NAMES = { balanced: ['Equilibrato', 'Fa tutto bene'], rusher: ['Rusher', 'Caccia col coltello'], farmer: ['Farmer', 'Solo risorse'], turtle: ['Tartaruga', 'Difende il totem'] };
+const NAMES = { balanced: ['Equilibrato', 'Fa tutto bene'], rusher: ['Rusher', 'Caccia col coltello'], farmer: ['Farmer', 'Solo risorse'], turtle: ['Tartaruga', 'Difende il totem'], racer: ['Racer', 'Dritto al totem'] };
 function paintArch() {
   $('arch').innerHTML = Object.entries(NAMES).map(([k, [t, d]]) =>
     `<button data-k="${k}" class="${k === arch ? 'on' : ''}">${t}<small>${d}</small></button>`).join('');
