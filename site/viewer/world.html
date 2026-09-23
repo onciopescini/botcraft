@@ -135,7 +135,10 @@ function renderStand() {
   const f = frames[Math.floor(t)];
   const rows = names.map(n => [n, f.a[n][2], f.a[n][3]]).sort((a, b) => b[1] - a[1]);
   let html = meta?.standings ? '<b>stagione (punti)</b><br/>' +
-    meta.standings.slice(0, 8).map((s, i) => `${i + 1}. ${s.name} ${s.score}`).join('<br/>') + '<br/><br/><b>ora (hp)</b><br/>' : '';
+    (() => { const top = Math.max(1, ...meta.standings.slice(0, 8).map(s => s.score));
+      return meta.standings.slice(0, 8).map((s, i) =>
+        `${i + 1}. ${s.name} ${s.score}<br/><span style="display:inline-block;height:6px;width:${Math.round(s.score / top * 120)}px;background:#ffd700;border-radius:3px;"></span>`).join('<br/>'); })() +
+    '<br/><br/><b>ora (hp)</b><br/>' : '';
   $('stand').innerHTML = html + rows.map(([n, hp, al]) =>
     `<span style="color:${colorOf(n)}">●</span> ${n} ${al ? hp + 'hp' : '<i>morto</i>'}`).join('<br/>');
 }

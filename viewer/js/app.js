@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { canvas, renderer, scene, camera, SET, saveSet, applySettings } from './config.js';
+import { canvas, renderer, scene, camera, SET, saveSet, applySettings, PAL } from './config.js';
 import { xz, dyn, treeGeo, treeMat, rockGeo, rockMat, wallGeo, wallMat, goldGeo, goldMat,
          gasMesh, ping1, ping2, totemMat, resize, orbit } from './scene.js';
 import { agent1, agent2, agent1b, agent1c, agent2b, agent2c, agentMat1, agentMat2,
-         smoothHp, setNames, placeLabels, feed, flashT, setPrevHp } from './actors.js';
+         smoothHp, setNames, placeLabels, feed, flashT, setPrevHp, recolor } from './actors.js';
 import { burst, tickParts, blip, setAudio, koFX, setSlowmo, setShake, slowmoUntil, shakeUntil } from './fx.js';
 
 applySettings();
@@ -159,6 +159,8 @@ function drawFrame(a, b, alpha) {
   const g1 = a.p1.gold || 0, g2 = a.p2.gold || 0;
   document.getElementById('hp1').style.width = Math.max(0, a.p1.hp) + '%';
   document.getElementById('hp2').style.width = Math.max(0, a.p2.hp) + '%';
+  document.getElementById('hp1').style.background = PAL().p1;
+  document.getElementById('hp2').style.background = PAL().p2;
   const msg = (a.m1 || a.m2) ? `\nmsg P1:"${a.m1 || ''}" P2:"${a.m2 || ''}"` : '';
   elStats.textContent =
     `P1 blu hp=${a.p1.hp} legna=${a.p1.wood} pietra=${a.p1.stone} gold=${g1} spada=${a.p1.sword ? 'si' : 'no'} [${a.a1}]\n` +
@@ -180,13 +182,13 @@ function drawMini(a) {
   for (const [x, y] of (a.golds || [])) mini.fillRect(px(x), px(y), 4, 4);
   mini.fillStyle = '#ffc94d'; mini.fillRect(px(16), px(16), 5, 5);
   if (Array.isArray(a.t1) && Array.isArray(a.t2)) {
-    mini.fillStyle = '#4da3ff';
+    mini.fillStyle = PAL().p1;
     for (const u of a.t1) mini.fillRect(px(u.x), px(u.y), 4, 4);
-    mini.fillStyle = '#ff5d5d';
+    mini.fillStyle = PAL().p2;
     for (const u of a.t2) mini.fillRect(px(u.x), px(u.y), 4, 4);
   } else {
-    mini.fillStyle = '#4da3ff'; mini.fillRect(px(a.p1.x), px(a.p1.y), 5, 5);
-    mini.fillStyle = '#ff5d5d'; mini.fillRect(px(a.p2.x), px(a.p2.y), 5, 5);
+    mini.fillStyle = PAL().p1; mini.fillRect(px(a.p1.x), px(a.p1.y), 5, 5);
+    mini.fillStyle = PAL().p2; mini.fillRect(px(a.p2.x), px(a.p2.y), 5, 5);
   }
 }
 function drawGraph() {
@@ -203,7 +205,7 @@ function drawGraph() {
     const cx = Math.floor(tFloat) / (frames.length - 1) * 160;
     graph.fillStyle = '#fff'; graph.fillRect(cx, 0, 1, 128);
   };
-  line('p1', '#4da3ff'); line('p2', '#ff5d5d');
+  line('p1', PAL().p1); line('p2', PAL().p2);
 }
 
 let last = performance.now();
@@ -368,6 +370,13 @@ document.getElementById('set-shake').addEventListener('click', () => {
 });
 document.getElementById('set-slow').addEventListener('click', () => {
   SET.slow = !SET.slow; saveSet(); applySettings();
+});
+document.getElementById('set-cb').addEventListener('click', () => {
+  SET.cb = !SET.cb; saveSet(); applySettings(); recolor();
+});
+// hover sonori sui bottoni (solo se audio attivo)
+document.getElementById('ui').addEventListener('mouseover', e => {
+  if (e.target.tagName === 'BUTTON') blip(880, 0.03, 0.03);
 });
 document.getElementById('clip').addEventListener('click', (e) => {
   const btn = e.target;

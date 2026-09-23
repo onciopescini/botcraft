@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { scene } from './config.js';
+import { scene, PAL } from './config.js';
 
 const agentGeo = new THREE.CapsuleGeometry(0.4, 0.8, 4, 8);
 const eyeGeo = new THREE.SphereGeometry(0.11, 8, 8);
@@ -31,13 +31,30 @@ function mk(color) {
   return m;
 }
 
-export const agent1 = mk(0x4da3ff);
-export const agent2 = mk(0xff5d5d);
+export const agent1 = mk(PAL().p1);
+export const agent2 = mk(PAL().p2);
 export const agent1b = mk(0x9fd0ff);
 export const agent1c = mk(0x2b6cb0);
 export const agent2b = mk(0xffa3a3);
 export const agent2c = mk(0xb02b2b);
 for (const m of [agent1b, agent1c, agent2b, agent2c]) m.visible = false;
+export function recolor() {
+  const P = PAL();
+  agent1.material.color.set(P.p1);
+  agent2.material.color.set(P.p2);
+  dressStripe(agent1, P.p1dark); dressStripe(agent2, P.p2dark);
+  setNames(lastN1, lastN2);
+}
+// striscia sostituibile per daltonici (la prima resta sotto, invisibile)
+function dressStripe(mesh, color) {
+  if (!mesh.userData.stripe2) {
+    mesh.userData.stripe2 = new THREE.Mesh(
+      new THREE.BoxGeometry(0.9, 0.2, 0.9),
+      new THREE.MeshStandardMaterial({ color }));
+    mesh.userData.stripe2.position.y = -0.35;
+    mesh.add(mesh.userData.stripe2);
+  } else mesh.userData.stripe2.material.color.set(color);
+}
 dressBot(agent1, 0x1e3a5f); dressBot(agent2, 0x5f1e1e);
 dressBot(agent1b, 0x1e3a5f); dressBot(agent1c, 0x1e3a5f);
 dressBot(agent2b, 0x5f1e1e); dressBot(agent2c, 0x5f1e1e);
@@ -71,12 +88,14 @@ function makeLabel(text, color) {
   sp.scale.set(3.4, 0.85, 1);
   return sp;
 }
-let label1 = makeLabel('Blu', '#4da3ff'), label2 = makeLabel('Rosso', '#ff5d5d');
+let label1 = makeLabel('Blu', PAL().p1), label2 = makeLabel('Rosso', PAL().p2);
+let lastN1 = 'Blu', lastN2 = 'Rosso';
 scene.add(label1, label2);
 export function setNames(n1, n2) {
+  lastN1 = n1.slice(0, 14); lastN2 = n2.slice(0, 14);
   scene.remove(label1, label2);
-  label1 = makeLabel(n1.slice(0, 14), '#4da3ff');
-  label2 = makeLabel(n2.slice(0, 14), '#ff5d5d');
+  label1 = makeLabel(lastN1, PAL().p1);
+  label2 = makeLabel(lastN2, PAL().p2);
   scene.add(label1, label2);
 }
 export function placeLabels(x1, z1, s1, x2, z2, s2) {
